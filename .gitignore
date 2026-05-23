@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Python virtual envs
+.venv/
+venv/
+
+# uv
+.python-version
+
+# AI models (large files)
+apps/ai/models/*.pt
+apps/ai/models/*.pth
+apps/ai/models/*.bin
+apps/ai/models/torch_cache/
+apps/ai/models/hf_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Turbo
+.turbo/
+
+
+.env
+.env.*
+

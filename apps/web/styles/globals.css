@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-cormorant: "Cormorant Garamond", Georgia, serif;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ivory text-warm-black font-sans;
+  }
+
+  ::selection {
+    @apply bg-blush text-warm-black;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.taupe") transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-taupe rounded-full;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  .label-xs {
+    @apply text-xs text-stone font-sans uppercase tracking-wider;
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      135deg,
+      #f0ebe4 25%,
+      #faf8f5 50%,
+      #f0ebe4 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  .glass {
+    backdrop-filter: blur(24px) saturate(1.4);
+    background: rgba(250, 248, 245, 0.85);
+    border: 1px solid rgba(250, 248, 245, 0.6);
+  }
+
+  .card-hover {
+    @apply transition-all duration-250 ease-silky;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+}
