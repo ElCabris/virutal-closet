@@ -45,6 +45,7 @@ class GarmentRepository {
     String? season,
     String? occasion,
     double? price,
+    String currency = AppConstants.defaultCurrency,
     String? notes,
     List<File> imageFiles = const [],
   }) async {
@@ -59,6 +60,7 @@ class GarmentRepository {
       'season': season,
       'occasion': occasion,
       'price': price,
+      'currency': currency,
       'notes': notes,
       'wear_count': 0,
     };

@@ -202,7 +202,7 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
               icon: Icons.attach_money,
               label: 'Cost / wear',
               value: garment.costPerWear > 0
-                  ? '\$${garment.costPerWear.toStringAsFixed(2)}'
+                  ? formatPrice(garment.costPerWear, garment.currency)
                   : 'N/A'),
         if (garment.lastWorn != null) ...[
           const SizedBox(width: 12),
@@ -249,7 +249,7 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
       'Season': garment.season,
       'Occasion': garment.occasion,
       'Price': garment.price != null
-          ? '\$${garment.price!.toStringAsFixed(2)}'
+          ? formatPrice(garment.price!, garment.currency)
           : null,
     };
 

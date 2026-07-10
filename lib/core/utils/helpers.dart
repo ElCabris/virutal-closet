@@ -5,7 +5,22 @@ import '../constants/app_constants.dart';
 
 String formatDate(DateTime date) => DateFormat('MMM d, yyyy').format(date);
 String formatShortDate(DateTime date) => DateFormat('MMM d').format(date);
-String formatCurrency(double amount) => NumberFormat.currency(symbol: '\$').format(amount);
+
+String formatPrice(double amount, [String currency = AppConstants.defaultCurrency]) {
+  final symbol = AppConstants.currencySymbols[currency] ?? currency;
+  final decimalDigits = AppConstants.zeroDecimalCurrencies.contains(currency) ? 0 : 2;
+  // es_CO's default currency pattern places the symbol as a suffix
+  // ("150.000 $"); a custom pattern forces the "$150.000" prefix style
+  // Colombian users expect, while keeping the locale's separators
+  // (period for thousands, comma for decimals).
+  final decimals = decimalDigits > 0 ? '.${'0' * decimalDigits}' : '';
+  return NumberFormat.currency(
+    locale: 'es_CO',
+    symbol: symbol,
+    decimalDigits: decimalDigits,
+    customPattern: '¤#,##0$decimals',
+  ).format(amount);
+}
 
 Color categoryColor(String category) {
   final map = {

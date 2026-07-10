@@ -1,3 +1,5 @@
+import '../../core/constants/app_constants.dart';
+
 class Garment {
   final String id;
   final String userId;
@@ -8,6 +10,7 @@ class Garment {
   final String? season;
   final String? occasion;
   final double? price;
+  final String currency;
   final List<String> imageUrls;
   final String? notes;
   final int wearCount;
@@ -24,6 +27,7 @@ class Garment {
     this.season,
     this.occasion,
     this.price,
+    this.currency = AppConstants.defaultCurrency,
     this.imageUrls = const [],
     this.notes,
     this.wearCount = 0,
@@ -48,6 +52,7 @@ class Garment {
         season: json['season'] as String?,
         occasion: json['occasion'] as String?,
         price: (json['price'] as num?)?.toDouble(),
+        currency: json['currency'] as String? ?? AppConstants.defaultCurrency,
         imageUrls: (json['image_urls'] as List<dynamic>?)
                 ?.map((e) => e as String)
                 .toList() ??
@@ -70,6 +75,7 @@ class Garment {
         'season': season,
         'occasion': occasion,
         'price': price,
+        'currency': currency,
         'notes': notes,
         'wear_count': wearCount,
         'last_worn': lastWorn?.toIso8601String(),
@@ -84,6 +90,7 @@ class Garment {
     String? season,
     String? occasion,
     double? price,
+    String? currency,
     List<String>? imageUrls,
     String? notes,
     int? wearCount,
@@ -99,6 +106,7 @@ class Garment {
         season: season ?? this.season,
         occasion: occasion ?? this.occasion,
         price: price ?? this.price,
+        currency: currency ?? this.currency,
         imageUrls: imageUrls ?? this.imageUrls,
         notes: notes ?? this.notes,
         wearCount: wearCount ?? this.wearCount,

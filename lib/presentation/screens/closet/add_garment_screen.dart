@@ -26,6 +26,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   String? _color;
   String? _season;
   String? _occasion;
+  String _currency = AppConstants.defaultCurrency;
   final List<File> _imageFiles = [];
   bool _saving = false;
 
@@ -74,6 +75,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             season: _season,
             occasion: _occasion,
             price: double.tryParse(_priceCtrl.text),
+            currency: _currency,
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
             imageFiles: _imageFiles,
           );
@@ -288,25 +290,38 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
               v == null || v.trim().isEmpty ? 'Enter garment name' : null,
         ),
         const SizedBox(height: 16),
+        TextFormField(
+          controller: _brandCtrl,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Brand'),
+        ),
+        const SizedBox(height: 16),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: TextFormField(
-                controller: _brandCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Brand'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+              flex: 2,
               child: TextFormField(
                 controller: _priceCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Price',
-                  prefixText: '\$ ',
-                ),
+                decoration: const InputDecoration(labelText: 'Price'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _currency,
+                decoration: const InputDecoration(labelText: 'Currency'),
+                items: AppConstants.currencies
+                    .map((code) => DropdownMenuItem(
+                          value: code,
+                          child: Text(code),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _currency = val);
+                },
               ),
             ),
           ],

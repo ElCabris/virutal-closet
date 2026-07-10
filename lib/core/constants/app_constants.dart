@@ -71,4 +71,19 @@ class AppConstants {
     'Silver',
     'Multicolor',
   ];
+
+  // Currencies (code -> symbol). COP has no decimal digits since Colombian
+  // peso prices are conventionally quoted as whole numbers.
+  static const String defaultCurrency = 'COP';
+
+  static const Map<String, String> currencySymbols = {
+    'COP': '\$',
+    'USD': 'US\$',
+    'EUR': '€',
+    'MXN': 'MX\$',
+  };
+
+  static const Set<String> zeroDecimalCurrencies = {'COP'};
+
+  static List<String> get currencies => currencySymbols.keys.toList();
 }
