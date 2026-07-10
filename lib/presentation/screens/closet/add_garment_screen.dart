@@ -83,9 +83,31 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
     final bgService = ref.read(backgroundRemovalServiceProvider);
     if (_removeBackground && bgService.isSupported) {
       setState(() => _processingImages = true);
+      final original = picked;
       picked = await bgService.removeBackgroundBatch(picked);
       if (!mounted) return;
       setState(() => _processingImages = false);
+
+      // removeBackground() falls back to returning the same File (same
+      // path) whenever it can't produce a cutout, so an unchanged path
+      // means that photo's background wasn't actually removed. Surfacing
+      // this beats failing silently — the toggle is on by default, so a
+      // user who never opens the console would otherwise have no way to
+      // tell it isn't working.
+      final skipped = <int>[
+        for (var i = 0; i < picked.length; i++)
+          if (picked[i].path == original[i].path) i,
+      ].length;
+      if (skipped > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Couldn't remove background for $skipped of "
+              '${picked.length} photo(s)',
+            ),
+          ),
+        );
+      }
     }
 
     setState(() => _imageFiles.addAll(picked));

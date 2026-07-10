@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:google_mlkit_subject_segmentation/google_mlkit_subject_segmentation.dart';
@@ -59,7 +60,17 @@ class BackgroundRemovalService {
       final result =
           await segmenter.processImage(InputImage.fromFilePath(image.path));
       final bitmap = result.foregroundBitmap;
-      if (bitmap == null || bitmap.isEmpty) return image;
+      if (bitmap == null || bitmap.isEmpty) {
+        // ML Kit ran without throwing but found nothing to isolate (or we
+        // didn't ask for a bitmap — shouldn't happen given the options
+        // above). Distinct from the catch below: this is *not* a crash,
+        // it's ML Kit declining to produce a cutout for this photo.
+        debugPrint(
+          '[BackgroundRemoval] no foreground bitmap for ${image.path} '
+          '(bitmap ${bitmap == null ? 'null' : 'empty'}); keeping original.',
+        );
+        return image;
+      }
 
       final dir = await getTemporaryDirectory();
       final outPath = p.join(
@@ -75,7 +86,17 @@ class BackgroundRemovalService {
       await deleteFileQuietly(image);
 
       return processed;
-    } catch (_) {
+    } catch (e, st) {
+      // Swallowed deliberately — background removal is best-effort, not a
+      // requirement for adding a garment — but logged, since a silent
+      // catch with no trace at all is very hard to diagnose from the
+      // field. A common cause here is ML Kit's on-device model not being
+      // downloaded yet on first use (it's fetched lazily via Play
+      // Services); that surfaces as an exception on the first few calls
+      // and should stop once it finishes downloading in the background.
+      debugPrint('[BackgroundRemoval] segmentation failed for '
+          '${image.path}: $e');
+      debugPrintStack(stackTrace: st, label: '[BackgroundRemoval]');
       return image;
     } finally {
       await segmenter.close();
