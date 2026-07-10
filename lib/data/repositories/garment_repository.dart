@@ -66,38 +66,30 @@ class GarmentRepository {
     await _supabase.from(AppConstants.tableGarments).insert(data);
 
     if (imageFiles.isNotEmpty) {
-      await _addImages(id, imageFiles);
+      try {
+        await _uploadAndLinkImages(id, imageFiles);
+      } catch (_) {
+        // Compensating action: Storage and Postgres can't share a
+        // transaction, so if attaching the requested photos fails we roll
+        // back the garment row ourselves. Leaving it around would (a) be a
+        // garment silently missing the photos the user asked for, and
+        // (b) risk a duplicate garment if the caller retries the save.
+        await _supabase.from(AppConstants.tableGarments).delete().eq('id', id);
+        rethrow;
+      }
     }
 
     return getGarment(id);
   }
 
-  Future<Garment> updateGarment(String id, Map<String, dynamic> updates,
-      {List<File> newImageFiles = const []}) async {
-    if (updates.isNotEmpty) {
-      await _supabase
-          .from(AppConstants.tableGarments)
-          .update(updates)
-          .eq('id', id)
-          .eq('user_id', _userId);
-    }
-
-    if (newImageFiles.isNotEmpty) {
-      await _addImages(id, newImageFiles);
-    }
-
-    return getGarment(id);
-  }
-
-  Future<void> removeGarmentImage(String garmentId, String storagePath) async {
-    await _supabase.storage
-        .from(AppConstants.bucketGarments)
-        .remove([storagePath]);
+  Future<Garment> updateGarment(String id, Map<String, dynamic> updates) async {
     await _supabase
-        .from(AppConstants.tableGarmentImages)
-        .delete()
-        .eq('garment_id', garmentId)
-        .eq('storage_path', storagePath);
+        .from(AppConstants.tableGarments)
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', _userId);
+
+    return getGarment(id);
   }
 
   Future<void> deleteGarment(String id) async {
@@ -106,44 +98,77 @@ class GarmentRepository {
         .select('storage_path')
         .eq('garment_id', id);
     final paths = images.map((row) => row['storage_path'] as String).toList();
-    if (paths.isNotEmpty) {
-      await _supabase.storage.from(AppConstants.bucketGarments).remove(paths);
-    }
 
-    // garment_images rows are removed automatically via ON DELETE CASCADE.
+    // Delete the DB row first (garment_images rows cascade automatically).
+    // If the storage cleanup below fails, the worst case is an orphaned
+    // file left in Storage — harmless and reclaimable later. Deleting
+    // storage first would risk the opposite: a garment_images row that
+    // still resolves to a now-missing file, which breaks the UI.
     await _supabase
         .from(AppConstants.tableGarments)
         .delete()
         .eq('id', id)
         .eq('user_id', _userId);
+
+    if (paths.isNotEmpty) {
+      await _supabase.storage.from(AppConstants.bucketGarments).remove(paths);
+    }
   }
 
   Future<void> incrementWearCount(String id) async {
-    final garment = await getGarment(id);
+    final row = await _supabase
+        .from(AppConstants.tableGarments)
+        .select('wear_count')
+        .eq('id', id)
+        .single();
     await _supabase.from(AppConstants.tableGarments).update({
-      'wear_count': garment.wearCount + 1,
+      'wear_count': (row['wear_count'] as int) + 1,
       'last_worn': DateTime.now().toIso8601String(),
     }).eq('id', id).eq('user_id', _userId);
   }
 
-  Future<void> _addImages(String garmentId, List<File> files) async {
-    final existing = await _supabase
-        .from(AppConstants.tableGarmentImages)
-        .select('id')
-        .eq('garment_id', garmentId);
-    final offset = existing.length;
+  /// Uploads [files] to Storage and links them to [garmentId] as a single
+  /// batch insert (one INSERT statement is atomic: either every row is
+  /// created or none is). Uploads run in parallel for speed; `Future.wait`
+  /// preserves the input order in its result regardless of completion
+  /// order, so `position` still reflects the order the user picked the
+  /// photos in even though uploads may finish out of order. `uploaded`
+  /// tracks paths as they complete (in completion order, which is fine — it
+  /// is only used for best-effort cleanup) so that if any upload or the
+  /// insert fails, whatever already made it to Storage is removed again
+  /// instead of leaking unreferenced files.
+  Future<void> _uploadAndLinkImages(String garmentId, List<File> files) async {
+    final uploaded = <String>[];
+    try {
+      final paths = await Future.wait(files.map((file) async {
+        final path = await _uploadImage(file);
+        uploaded.add(path);
+        return path;
+      }));
 
-    final rows = <Map<String, dynamic>>[];
-    for (var i = 0; i < files.length; i++) {
-      final path = await _uploadImage(files[i]);
-      rows.add({
-        'garment_id': garmentId,
-        'user_id': _userId,
-        'storage_path': path,
-        'position': offset + i,
-      });
+      final rows = [
+        for (var i = 0; i < paths.length; i++)
+          {
+            'garment_id': garmentId,
+            'user_id': _userId,
+            'storage_path': paths[i],
+            'position': i,
+          },
+      ];
+      await _supabase.from(AppConstants.tableGarmentImages).insert(rows);
+    } catch (_) {
+      if (uploaded.isNotEmpty) {
+        try {
+          await _supabase.storage
+              .from(AppConstants.bucketGarments)
+              .remove(uploaded);
+        } catch (_) {
+          // Best-effort only — a leaked file is preferable to masking the
+          // original failure with a secondary one.
+        }
+      }
+      rethrow;
     }
-    await _supabase.from(AppConstants.tableGarmentImages).insert(rows);
   }
 
   Future<String> _uploadImage(File file) async {
@@ -152,26 +177,35 @@ class GarmentRepository {
     return path;
   }
 
-  /// Merges the joined `garment_images` rows into a single ordered
-  /// `image_urls` list so [Garment.fromJson] can stay storage-agnostic.
+  /// Returns a copy of [json] with the joined `garment_images` rows
+  /// flattened into an ordered `image_urls` list, so [Garment.fromJson]
+  /// can stay storage-agnostic. Never mutates the map or list it receives.
   Map<String, dynamic> _resolveImages(Map<String, dynamic> json) {
-    final images = (json['garment_images'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>()
+    final rawImages = json['garment_images'] as List<dynamic>? ?? const [];
+    final images = rawImages.map((e) => e as Map<String, dynamic>).toList()
       ..sort((a, b) => (a['position'] as int).compareTo(b['position'] as int));
 
-    json['image_urls'] = images
-        .map((img) => _supabase.storage
-            .from(AppConstants.bucketGarments)
-            .getPublicUrl(img['storage_path'] as String))
-        .toList();
-    return json;
+    return {
+      ...json,
+      'image_urls': [
+        for (final img in images)
+          _supabase.storage
+              .from(AppConstants.bucketGarments)
+              .getPublicUrl(img['storage_path'] as String),
+      ],
+    };
   }
 
   Future<Map<String, int>> getCategoryStats() async {
-    final garments = await getGarments();
+    final data = await _supabase
+        .from(AppConstants.tableGarments)
+        .select('category')
+        .eq('user_id', _userId);
+
     final stats = <String, int>{};
-    for (final g in garments) {
-      stats[g.category] = (stats[g.category] ?? 0) + 1;
+    for (final row in data) {
+      final category = row['category'] as String;
+      stats[category] = (stats[category] ?? 0) + 1;
     }
     return stats;
   }
