@@ -121,13 +121,4 @@ Suggestions are generated fresh each time (no caching) and can be saved directly
 
 ## Building for release
 
-```bash
-# Android APK
-flutter build apk --release
-
-# Android App Bundle (Play Store)
-flutter build appbundle --release
-
-# iOS (requires macOS + Xcode)
-flutter build ipa
-```
+See [README.md](README.md#building-the-app) for build commands across all platforms (Android, iOS, desktop, web).
