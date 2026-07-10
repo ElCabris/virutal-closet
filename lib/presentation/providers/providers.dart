@@ -5,6 +5,7 @@ import '../../data/repositories/garment_repository.dart';
 import '../../data/repositories/outfit_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/datasources/ai_service.dart';
+import '../../data/datasources/background_removal_service.dart';
 import '../../data/models/garment.dart';
 import '../../data/models/outfit.dart';
 import '../../data/models/calendar_entry.dart';
@@ -20,6 +21,10 @@ final aiServiceProvider = Provider<AiService>(
     dotenv.env['AI_API_KEY'] ?? '',
     dotenv.env['AI_MODEL'] ?? '',
   ),
+);
+
+final backgroundRemovalServiceProvider = Provider<BackgroundRemovalService>(
+  (_) => BackgroundRemovalService(),
 );
 
 // ─── Repositories ─────────────────────────────────────────────────────────────

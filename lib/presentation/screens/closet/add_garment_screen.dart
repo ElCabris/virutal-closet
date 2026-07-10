@@ -29,6 +29,8 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   String _currency = AppConstants.defaultCurrency;
   final List<File> _imageFiles = [];
   bool _saving = false;
+  bool _removeBackground = true;
+  bool _processingImages = false;
 
   @override
   void dispose() {
@@ -41,26 +43,34 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
 
   Future<void> _pickImages(ImageSource source) async {
     final picker = ImagePicker();
+    List<File> picked;
     if (source == ImageSource.gallery) {
-      final picked = await picker.pickMultiImage(
+      final files = await picker.pickMultiImage(
         maxWidth: 1200,
         maxHeight: 1200,
         imageQuality: 85,
       );
-      if (picked.isNotEmpty && mounted) {
-        setState(() => _imageFiles.addAll(picked.map((p) => File(p.path))));
-      }
+      picked = files.map((p) => File(p.path)).toList();
     } else {
-      final picked = await picker.pickImage(
+      final file = await picker.pickImage(
         source: source,
         maxWidth: 1200,
         maxHeight: 1200,
         imageQuality: 85,
       );
-      if (picked != null && mounted) {
-        setState(() => _imageFiles.add(File(picked.path)));
-      }
+      picked = file != null ? [File(file.path)] : [];
     }
+    if (picked.isEmpty || !mounted) return;
+
+    final bgService = ref.read(backgroundRemovalServiceProvider);
+    if (_removeBackground && bgService.isSupported) {
+      setState(() => _processingImages = true);
+      picked = await Future.wait(picked.map(bgService.removeBackground));
+      if (!mounted) return;
+      setState(() => _processingImages = false);
+    }
+
+    setState(() => _imageFiles.addAll(picked));
   }
 
   Future<void> _save() async {
@@ -123,6 +133,10 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             _buildImagePicker().animate().fadeIn(),
+            if (ref.read(backgroundRemovalServiceProvider).isSupported) ...[
+              const SizedBox(height: 12),
+              _buildBackgroundRemovalToggle().animate().fadeIn(delay: 50.ms),
+            ],
             const SizedBox(height: 28),
             _buildBasicInfo().animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 20),
@@ -143,6 +157,33 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   }
 
   Widget _buildImagePicker() {
+    return Stack(
+      children: [
+        _buildImagePickerContent(),
+        if (_processingImages)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.background.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 12),
+                    Text('Removing background...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildImagePickerContent() {
     if (_imageFiles.isEmpty) {
       return GestureDetector(
         onTap: _showImageSourceSheet,
@@ -274,6 +315,24 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBackgroundRemovalToggle() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Remove background'),
+        subtitle: const Text('Applies on-device to new photos'),
+        value: _removeBackground,
+        onChanged: (val) => setState(() => _removeBackground = val),
       ),
     );
   }

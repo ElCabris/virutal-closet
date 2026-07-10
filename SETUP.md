@@ -11,6 +11,7 @@
 | Navigation | GoRouter |
 | Backend | Supabase (Auth + DB + Storage) |
 | AI Suggestions | Anthropic Messages API (model set via `AI_MODEL`) |
+| Background Removal | ML Kit Subject Segmentation, on-device (Android only) |
 | Charts | fl_chart |
 | Calendar | table_calendar |
 
@@ -21,7 +22,7 @@
 | Splash | Logo animation → Auth check |
 | Login / Register | Supabase email/password auth |
 | My Closet | Grid of garments, filter by category |
-| Add Garment | Photo + metadata form |
+| Add Garment | Photo + metadata form, optional on-device background removal (Android, on by default) |
 | Garment Detail | Stats, wear tracking, delete |
 | My Outfits | Saved outfits + AI tab |
 | AI Suggestions | AI generates outfits from wardrobe |
