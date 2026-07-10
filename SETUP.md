@@ -61,6 +61,7 @@ AI_MODEL=<model-id>
    ```
    supabase/migrations/001_initial_schema.sql
    supabase/migrations/002_garment_multiple_images.sql
+   supabase/migrations/003_garment_images_table.sql
    ```
 3. In **Storage**, verify 3 buckets were created: `garments`, `outfits`, `avatars`
 4. Copy your Project URL and anon key into `.env`

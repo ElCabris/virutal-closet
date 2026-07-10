@@ -6,6 +6,7 @@ class AppConstants {
 
   // Supabase tables
   static const String tableGarments = 'garments';
+  static const String tableGarmentImages = 'garment_images';
   static const String tableOutfits = 'outfits';
   static const String tableOutfitGarments = 'outfit_garments';
   static const String tableCalendarEntries = 'calendar_entries';

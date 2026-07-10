@@ -12,10 +12,12 @@ class GarmentRepository {
 
   String get _userId => _supabase.auth.currentUser!.id;
 
+  static const _garmentSelect = '*, garment_images(storage_path, position)';
+
   Future<List<Garment>> getGarments({String? category}) async {
     var query = _supabase
         .from(AppConstants.tableGarments)
-        .select()
+        .select(_garmentSelect)
         .eq('user_id', _userId);
 
     if (category != null && category != 'All') {
@@ -23,16 +25,16 @@ class GarmentRepository {
     }
 
     final data = await query.order('created_at', ascending: false);
-    return data.map((json) => Garment.fromJson(json)).toList();
+    return data.map((json) => Garment.fromJson(_resolveImages(json))).toList();
   }
 
   Future<Garment> getGarment(String id) async {
     final data = await _supabase
         .from(AppConstants.tableGarments)
-        .select()
+        .select(_garmentSelect)
         .eq('id', id)
         .single();
-    return Garment.fromJson(data);
+    return Garment.fromJson(_resolveImages(data));
   }
 
   Future<Garment> createGarment({
@@ -46,11 +48,6 @@ class GarmentRepository {
     String? notes,
     List<File> imageFiles = const [],
   }) async {
-    final imageUrls = <String>[];
-    for (final file in imageFiles) {
-      imageUrls.add(await _uploadImage(file));
-    }
-
     final id = _uuid.v4();
     final data = {
       'id': id,
@@ -62,49 +59,58 @@ class GarmentRepository {
       'season': season,
       'occasion': occasion,
       'price': price,
-      'image_urls': imageUrls,
       'notes': notes,
       'wear_count': 0,
     };
 
-    final result = await _supabase
-        .from(AppConstants.tableGarments)
-        .insert(data)
-        .select()
-        .single();
+    await _supabase.from(AppConstants.tableGarments).insert(data);
 
-    return Garment.fromJson(result);
+    if (imageFiles.isNotEmpty) {
+      await _addImages(id, imageFiles);
+    }
+
+    return getGarment(id);
   }
 
   Future<Garment> updateGarment(String id, Map<String, dynamic> updates,
       {List<File> newImageFiles = const []}) async {
-    if (newImageFiles.isNotEmpty) {
-      final existing = (updates['image_urls'] as List<String>?) ??
-          (await getGarment(id)).imageUrls;
-      final uploaded = <String>[];
-      for (final file in newImageFiles) {
-        uploaded.add(await _uploadImage(file));
-      }
-      updates['image_urls'] = [...existing, ...uploaded];
+    if (updates.isNotEmpty) {
+      await _supabase
+          .from(AppConstants.tableGarments)
+          .update(updates)
+          .eq('id', id)
+          .eq('user_id', _userId);
     }
 
-    final result = await _supabase
-        .from(AppConstants.tableGarments)
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', _userId)
-        .select()
-        .single();
+    if (newImageFiles.isNotEmpty) {
+      await _addImages(id, newImageFiles);
+    }
 
-    return Garment.fromJson(result);
+    return getGarment(id);
+  }
+
+  Future<void> removeGarmentImage(String garmentId, String storagePath) async {
+    await _supabase.storage
+        .from(AppConstants.bucketGarments)
+        .remove([storagePath]);
+    await _supabase
+        .from(AppConstants.tableGarmentImages)
+        .delete()
+        .eq('garment_id', garmentId)
+        .eq('storage_path', storagePath);
   }
 
   Future<void> deleteGarment(String id) async {
-    final garment = await getGarment(id);
-    for (final url in garment.imageUrls) {
-      await _deleteImage(url);
+    final images = await _supabase
+        .from(AppConstants.tableGarmentImages)
+        .select('storage_path')
+        .eq('garment_id', id);
+    final paths = images.map((row) => row['storage_path'] as String).toList();
+    if (paths.isNotEmpty) {
+      await _supabase.storage.from(AppConstants.bucketGarments).remove(paths);
     }
 
+    // garment_images rows are removed automatically via ON DELETE CASCADE.
     await _supabase
         .from(AppConstants.tableGarments)
         .delete()
@@ -120,22 +126,45 @@ class GarmentRepository {
     }).eq('id', id).eq('user_id', _userId);
   }
 
-  Future<String> _uploadImage(File file) async {
-    final fileName = '${_userId}/${_uuid.v4()}.jpg';
-    await _supabase.storage
-        .from(AppConstants.bucketGarments)
-        .upload(fileName, file);
-    return _supabase.storage
-        .from(AppConstants.bucketGarments)
-        .getPublicUrl(fileName);
+  Future<void> _addImages(String garmentId, List<File> files) async {
+    final existing = await _supabase
+        .from(AppConstants.tableGarmentImages)
+        .select('id')
+        .eq('garment_id', garmentId);
+    final offset = existing.length;
+
+    final rows = <Map<String, dynamic>>[];
+    for (var i = 0; i < files.length; i++) {
+      final path = await _uploadImage(files[i]);
+      rows.add({
+        'garment_id': garmentId,
+        'user_id': _userId,
+        'storage_path': path,
+        'position': offset + i,
+      });
+    }
+    await _supabase.from(AppConstants.tableGarmentImages).insert(rows);
   }
 
-  Future<void> _deleteImage(String url) async {
-    try {
-      final uri = Uri.parse(url);
-      final path = uri.pathSegments.skipWhile((s) => s != AppConstants.bucketGarments).skip(1).join('/');
-      await _supabase.storage.from(AppConstants.bucketGarments).remove([path]);
-    } catch (_) {}
+  Future<String> _uploadImage(File file) async {
+    final path = '$_userId/${_uuid.v4()}.jpg';
+    await _supabase.storage.from(AppConstants.bucketGarments).upload(path, file);
+    return path;
+  }
+
+  /// Merges the joined `garment_images` rows into a single ordered
+  /// `image_urls` list so [Garment.fromJson] can stay storage-agnostic.
+  Map<String, dynamic> _resolveImages(Map<String, dynamic> json) {
+    final images = (json['garment_images'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+      ..sort((a, b) => (a['position'] as int).compareTo(b['position'] as int));
+
+    json['image_urls'] = images
+        .map((img) => _supabase.storage
+            .from(AppConstants.bucketGarments)
+            .getPublicUrl(img['storage_path'] as String))
+        .toList();
+    return json;
   }
 
   Future<Map<String, int>> getCategoryStats() async {
@@ -150,20 +179,20 @@ class GarmentRepository {
   Future<List<Garment>> getLeastWorn({int limit = 5}) async {
     final data = await _supabase
         .from(AppConstants.tableGarments)
-        .select()
+        .select(_garmentSelect)
         .eq('user_id', _userId)
         .order('wear_count', ascending: true)
         .limit(limit);
-    return data.map((json) => Garment.fromJson(json)).toList();
+    return data.map((json) => Garment.fromJson(_resolveImages(json))).toList();
   }
 
   Future<List<Garment>> getMostWorn({int limit = 5}) async {
     final data = await _supabase
         .from(AppConstants.tableGarments)
-        .select()
+        .select(_garmentSelect)
         .eq('user_id', _userId)
         .order('wear_count', ascending: false)
         .limit(limit);
-    return data.map((json) => Garment.fromJson(json)).toList();
+    return data.map((json) => Garment.fromJson(_resolveImages(json))).toList();
   }
 }
