@@ -57,9 +57,10 @@ AI_MODEL=<model-id>
 ### 3. Set up Supabase
 
 1. Create a project at https://supabase.com
-2. Go to **SQL Editor** and run the migration:
+2. Go to **SQL Editor** and run the migrations in order:
    ```
    supabase/migrations/001_initial_schema.sql
+   supabase/migrations/002_garment_multiple_images.sql
    ```
 3. In **Storage**, verify 3 buckets were created: `garments`, `outfits`, `avatars`
 4. Copy your Project URL and anon key into `.env`
