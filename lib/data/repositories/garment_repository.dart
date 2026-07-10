@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/garment.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/file_utils.dart';
 
 class GarmentRepository {
   GarmentRepository(this._supabase);
@@ -76,8 +77,19 @@ class GarmentRepository {
         // back the garment row ourselves. Leaving it around would (a) be a
         // garment silently missing the photos the user asked for, and
         // (b) risk a duplicate garment if the caller retries the save.
+        // The local files in imageFiles are left untouched here — they
+        // were never durably persisted, so deleting them would be a real
+        // data loss (the caller has nothing left to retry with).
         await _supabase.from(AppConstants.tableGarments).delete().eq('id', id);
         rethrow;
+      }
+
+      // The bytes are durably in Storage now, so the local working copies
+      // (originals or background-removed versions) are disposable. This is
+      // the only point where that's actually guaranteed, which is why
+      // cleanup lives here rather than in the UI layer that picked them.
+      for (final file in imageFiles) {
+        await deleteFileQuietly(file);
       }
     }
 

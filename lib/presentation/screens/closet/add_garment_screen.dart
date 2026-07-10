@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/providers.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/file_utils.dart';
 
 class AddGarmentScreen extends ConsumerStatefulWidget {
   const AddGarmentScreen({super.key});
@@ -38,7 +40,23 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
     _brandCtrl.dispose();
     _priceCtrl.dispose();
     _notesCtrl.dispose();
+    // If a save is in flight, the repository is (or is about to be)
+    // reading these same files to upload them — deleting them here would
+    // race with that read. In that case leave cleanup to _save(): the
+    // repository deletes local files itself once the upload is durably
+    // confirmed, and never deletes them on failure. Only clean up here for
+    // the "user picked photos and left without saving" case, where nothing
+    // else is going to touch these files again.
+    if (!_saving) {
+      unawaited(_deleteImageFilesQuietly(_imageFiles));
+    }
     super.dispose();
+  }
+
+  static Future<void> _deleteImageFilesQuietly(List<File> files) async {
+    for (final file in files) {
+      await deleteFileQuietly(file);
+    }
   }
 
   Future<void> _pickImages(ImageSource source) async {
@@ -65,7 +83,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
     final bgService = ref.read(backgroundRemovalServiceProvider);
     if (_removeBackground && bgService.isSupported) {
       setState(() => _processingImages = true);
-      picked = await Future.wait(picked.map(bgService.removeBackground));
+      picked = await bgService.removeBackgroundBatch(picked);
       if (!mounted) return;
       setState(() => _processingImages = false);
     }
@@ -254,8 +272,11 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _imageFiles.removeAt(index)),
+                      onTap: () {
+                        final removed = _imageFiles[index];
+                        setState(() => _imageFiles.removeAt(index));
+                        unawaited(deleteFileQuietly(removed));
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: const BoxDecoration(
