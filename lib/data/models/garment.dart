@@ -70,7 +70,6 @@ class Garment {
         'season': season,
         'occasion': occasion,
         'price': price,
-        'image_urls': imageUrls,
         'notes': notes,
         'wear_count': wearCount,
         'last_worn': lastWorn?.toIso8601String(),
