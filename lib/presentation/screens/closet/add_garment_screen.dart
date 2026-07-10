@@ -26,7 +26,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   String? _color;
   String? _season;
   String? _occasion;
-  File? _imageFile;
+  final List<File> _imageFiles = [];
   bool _saving = false;
 
   @override
@@ -38,16 +38,27 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImages(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: source,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
-    if (picked != null && mounted) {
-      setState(() => _imageFile = File(picked.path));
+    if (source == ImageSource.gallery) {
+      final picked = await picker.pickMultiImage(
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked.isNotEmpty && mounted) {
+        setState(() => _imageFiles.addAll(picked.map((p) => File(p.path))));
+      }
+    } else {
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _imageFiles.add(File(picked.path)));
+      }
     }
   }
 
@@ -64,7 +75,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             occasion: _occasion,
             price: double.tryParse(_priceCtrl.text),
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-            imageFile: _imageFile,
+            imageFiles: _imageFiles,
           );
       ref.invalidate(garmentsProvider);
       if (mounted) context.pop();
@@ -130,60 +141,93 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   }
 
   Widget _buildImagePicker() {
-    return GestureDetector(
-      onTap: _showImageSourceSheet,
-      child: Container(
-        height: 220,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppColors.border,
-            width: _imageFile == null ? 1 : 0,
+    if (_imageFiles.isEmpty) {
+      return GestureDetector(
+        onTap: _showImageSourceSheet,
+        child: Container(
+          height: 220,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.add_photo_alternate_outlined,
+                  color: AppColors.textDisabled, size: 40),
+              const SizedBox(height: 12),
+              Text(
+                'Add photos',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap to upload from camera or gallery',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
-        child: _imageFile != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.file(_imageFile!, fit: BoxFit.cover),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _imageFile = null),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppColors.background,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close, size: 16),
+      );
+    }
+
+    return SizedBox(
+      height: 220,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _imageFiles.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          if (index == _imageFiles.length) {
+            return GestureDetector(
+              onTap: _showImageSourceSheet,
+              child: Container(
+                width: 140,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border, width: 1),
+                ),
+                child: const Center(
+                  child: Icon(Icons.add_photo_alternate_outlined,
+                      color: AppColors.textDisabled, size: 32),
+                ),
+              ),
+            );
+          }
+          return Container(
+            width: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(_imageFiles[index], fit: BoxFit.cover),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () =>
+                          setState(() => _imageFiles.removeAt(index)),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: AppColors.background,
+                          shape: BoxShape.circle,
                         ),
+                        child: const Icon(Icons.close, size: 16),
                       ),
                     ),
-                  ],
-                ),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add_photo_alternate_outlined,
-                      color: AppColors.textDisabled, size: 40),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Add photo',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap to upload from camera or gallery',
-                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -214,7 +258,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
               title: const Text('Camera'),
               onTap: () {
                 context.pop();
-                _pickImage(ImageSource.camera);
+                _pickImages(ImageSource.camera);
               },
             ),
             ListTile(
@@ -222,7 +266,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
               title: const Text('Gallery'),
               onTap: () {
                 context.pop();
-                _pickImage(ImageSource.gallery);
+                _pickImages(ImageSource.gallery);
               },
             ),
             const SizedBox(height: 8),

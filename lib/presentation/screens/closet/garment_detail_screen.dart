@@ -8,13 +8,28 @@ import '../../widgets/common/loading_indicator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/helpers.dart';
 
-class GarmentDetailScreen extends ConsumerWidget {
+class GarmentDetailScreen extends ConsumerStatefulWidget {
   const GarmentDetailScreen({super.key, required this.id});
   final String id;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final garmentAsync = ref.watch(garmentProvider(id));
+  ConsumerState<GarmentDetailScreen> createState() =>
+      _GarmentDetailScreenState();
+}
+
+class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
+  final _pageController = PageController();
+  int _photoIndex = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final garmentAsync = ref.watch(garmentProvider(widget.id));
 
     return garmentAsync.when(
       loading: () => const Scaffold(body: LoadingIndicator()),
@@ -51,22 +66,7 @@ class GarmentDetailScreen extends ConsumerWidget {
                 ),
               ],
               flexibleSpace: FlexibleSpaceBar(
-                background: garment.imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: garment.imageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: AppColors.surfaceVariant),
-                      )
-                    : Container(
-                        color: AppColors.surfaceVariant,
-                        child: Center(
-                          child: Text(
-                            categoryIcon(garment.category),
-                            style: const TextStyle(fontSize: 80),
-                          ),
-                        ),
-                      ),
+                background: _buildPhotoGallery(garment),
               ),
             ),
             SliverPadding(
@@ -90,6 +90,61 @@ class GarmentDetailScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPhotoGallery(garment) {
+    final photos = garment.imageUrls as List<String>;
+    if (photos.isEmpty) {
+      return Container(
+        color: AppColors.surfaceVariant,
+        child: Center(
+          child: Text(
+            categoryIcon(garment.category),
+            style: const TextStyle(fontSize: 80),
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _photoIndex = i),
+          itemBuilder: (_, i) => CachedNetworkImage(
+            imageUrl: photos[i],
+            fit: BoxFit.cover,
+            placeholder: (_, __) => Container(color: AppColors.surfaceVariant),
+          ),
+        ),
+        if (photos.length > 1)
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(photos.length, (i) {
+                final active = i == _photoIndex;
+                return AnimatedContainer(
+                  duration: 200.ms,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? AppColors.primary
+                        : AppColors.background.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
     );
   }
 
@@ -290,7 +345,7 @@ class GarmentDetailScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               context.pop();
-              await ref.read(garmentRepositoryProvider).deleteGarment(id);
+              await ref.read(garmentRepositoryProvider).deleteGarment(widget.id);
               ref.invalidate(garmentsProvider);
               if (context.mounted) context.pop();
             },

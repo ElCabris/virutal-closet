@@ -44,12 +44,11 @@ class GarmentRepository {
     String? occasion,
     double? price,
     String? notes,
-    File? imageFile,
+    List<File> imageFiles = const [],
   }) async {
-    String? imageUrl;
-
-    if (imageFile != null) {
-      imageUrl = await _uploadImage(imageFile);
+    final imageUrls = <String>[];
+    for (final file in imageFiles) {
+      imageUrls.add(await _uploadImage(file));
     }
 
     final id = _uuid.v4();
@@ -63,7 +62,7 @@ class GarmentRepository {
       'season': season,
       'occasion': occasion,
       'price': price,
-      'image_url': imageUrl,
+      'image_urls': imageUrls,
       'notes': notes,
       'wear_count': 0,
     };
@@ -78,9 +77,15 @@ class GarmentRepository {
   }
 
   Future<Garment> updateGarment(String id, Map<String, dynamic> updates,
-      {File? imageFile}) async {
-    if (imageFile != null) {
-      updates['image_url'] = await _uploadImage(imageFile);
+      {List<File> newImageFiles = const []}) async {
+    if (newImageFiles.isNotEmpty) {
+      final existing = (updates['image_urls'] as List<String>?) ??
+          (await getGarment(id)).imageUrls;
+      final uploaded = <String>[];
+      for (final file in newImageFiles) {
+        uploaded.add(await _uploadImage(file));
+      }
+      updates['image_urls'] = [...existing, ...uploaded];
     }
 
     final result = await _supabase
@@ -96,8 +101,8 @@ class GarmentRepository {
 
   Future<void> deleteGarment(String id) async {
     final garment = await getGarment(id);
-    if (garment.imageUrl != null) {
-      await _deleteImage(garment.imageUrl!);
+    for (final url in garment.imageUrls) {
+      await _deleteImage(url);
     }
 
     await _supabase

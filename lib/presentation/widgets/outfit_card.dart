@@ -59,7 +59,7 @@ class OutfitCard extends StatelessWidget {
     if (garments.length == 1) {
       return ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        child: _buildGarmentImage(garments[0].imageUrl),
+        child: _buildGarmentImage(garments[0].coverImageUrl),
       );
     }
 
@@ -70,7 +70,7 @@ class OutfitCard extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         children: garments
             .take(4)
-            .map((g) => _buildGarmentImage(g.imageUrl))
+            .map((g) => _buildGarmentImage(g.coverImageUrl))
             .toList(),
       ),
     );

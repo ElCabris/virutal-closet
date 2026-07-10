@@ -56,9 +56,9 @@ class GarmentCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          garment.imageUrl != null
+          garment.coverImageUrl != null
               ? CachedNetworkImage(
-                  imageUrl: garment.imageUrl!,
+                  imageUrl: garment.coverImageUrl!,
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(color: AppColors.surfaceVariant),
                   errorWidget: (_, __, ___) => _buildPlaceholder(),

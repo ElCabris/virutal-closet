@@ -8,7 +8,7 @@ class Garment {
   final String? season;
   final String? occasion;
   final double? price;
-  final String? imageUrl;
+  final List<String> imageUrls;
   final String? notes;
   final int wearCount;
   final DateTime? lastWorn;
@@ -24,12 +24,14 @@ class Garment {
     this.season,
     this.occasion,
     this.price,
-    this.imageUrl,
+    this.imageUrls = const [],
     this.notes,
     this.wearCount = 0,
     this.lastWorn,
     required this.createdAt,
   });
+
+  String? get coverImageUrl => imageUrls.isEmpty ? null : imageUrls.first;
 
   double get costPerWear {
     if (price == null || price! <= 0 || wearCount <= 0) return price ?? 0;
@@ -46,7 +48,10 @@ class Garment {
         season: json['season'] as String?,
         occasion: json['occasion'] as String?,
         price: (json['price'] as num?)?.toDouble(),
-        imageUrl: json['image_url'] as String?,
+        imageUrls: (json['image_urls'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
         notes: json['notes'] as String?,
         wearCount: json['wear_count'] as int? ?? 0,
         lastWorn: json['last_worn'] != null
@@ -65,7 +70,7 @@ class Garment {
         'season': season,
         'occasion': occasion,
         'price': price,
-        'image_url': imageUrl,
+        'image_urls': imageUrls,
         'notes': notes,
         'wear_count': wearCount,
         'last_worn': lastWorn?.toIso8601String(),
@@ -80,7 +85,7 @@ class Garment {
     String? season,
     String? occasion,
     double? price,
-    String? imageUrl,
+    List<String>? imageUrls,
     String? notes,
     int? wearCount,
     DateTime? lastWorn,
@@ -95,7 +100,7 @@ class Garment {
         season: season ?? this.season,
         occasion: occasion ?? this.occasion,
         price: price ?? this.price,
-        imageUrl: imageUrl ?? this.imageUrl,
+        imageUrls: imageUrls ?? this.imageUrls,
         notes: notes ?? this.notes,
         wearCount: wearCount ?? this.wearCount,
         lastWorn: lastWorn ?? this.lastWorn,
