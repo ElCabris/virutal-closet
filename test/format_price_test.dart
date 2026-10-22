@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:crayoli_closet/core/utils/helpers.dart';
+import 'package:virtual_closet/core/utils/helpers.dart';
 
 void main() {
   group('formatPrice', () {

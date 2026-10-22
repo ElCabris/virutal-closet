@@ -31,7 +31,7 @@ Future<void> main() async {
 
   runApp(
     const ProviderScope(
-      child: CrayoliApp(),
+      child: VirtualClosetApp(),
     ),
   );
 }

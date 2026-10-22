@@ -6,6 +6,7 @@ import '../../data/repositories/outfit_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/datasources/ai_service.dart';
 import '../../data/datasources/background_removal_service.dart';
+import '../../data/datasources/model_install_service.dart';
 import '../../data/models/garment.dart';
 import '../../data/models/outfit.dart';
 import '../../data/models/calendar_entry.dart';
@@ -26,6 +27,16 @@ final aiServiceProvider = Provider<AiService>(
 final backgroundRemovalServiceProvider = Provider<BackgroundRemovalService>(
   (_) => BackgroundRemovalService(),
 );
+
+final modelInstallServiceProvider = Provider<ModelInstallService>(
+  (_) => ModelInstallService(),
+);
+
+/// Subject Segmentation model download progress: null while unknown/not yet
+/// requested, 0-99 while downloading, 100 once confirmed available. Set by
+/// SplashScreen at startup and read by AddGarmentScreen to tell a genuine
+/// "still downloading" state apart from a real segmentation failure.
+final backgroundRemovalModelProgressProvider = StateProvider<int?>((_) => null);
 
 // ─── Repositories ─────────────────────────────────────────────────────────────
 

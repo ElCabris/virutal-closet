@@ -130,15 +130,15 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class CrayoliApp extends ConsumerWidget {
-  const CrayoliApp({super.key});
+class VirtualClosetApp extends ConsumerWidget {
+  const VirtualClosetApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Crayoli Closet',
+      title: 'Virtual Closet',
       theme: AppTheme.dark,
       routerConfig: router,
       debugShowCheckedModeBanner: false,

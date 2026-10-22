@@ -1,6 +1,6 @@
 {
-    "name": "crayoli_closet",
-    "short_name": "crayoli_closet",
+    "name": "Virtual Closet",
+    "short_name": "Virtual Closet",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

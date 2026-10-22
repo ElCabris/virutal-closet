@@ -1,4 +1,4 @@
-# Crayoli Closet — Mobile
+# Virtual Closet — Mobile
 
 > Your closet, curated. — Flutter + Supabase virtual wardrobe app.
 

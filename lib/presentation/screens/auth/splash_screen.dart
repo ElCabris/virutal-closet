@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +19,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   void initState() {
     super.initState();
     _navigate();
+    // Fire-and-forget: the model can take minutes to download on a slow
+    // connection, so this must not block the splash screen. Progress lands
+    // in backgroundRemovalModelProgressProvider for AddGarmentScreen to
+    // read whenever the user gets there. Deferred via Future() (not called
+    // directly) because Riverpod forbids modifying provider state
+    // synchronously from initState — it needs to run after this frame.
+    unawaited(Future(_ensureBackgroundRemovalModel));
   }
 
   Future<void> _navigate() async {
@@ -30,6 +38,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     } else {
       context.go('/login');
     }
+  }
+
+  Future<void> _ensureBackgroundRemovalModel() async {
+    final modelInstallService = ref.read(modelInstallServiceProvider);
+    if (!modelInstallService.isSupported) return;
+
+    final progressNotifier = ref.read(
+      backgroundRemovalModelProgressProvider.notifier,
+    );
+    progressNotifier.state = 0;
+    final subscription = modelInstallService.downloadProgress.listen(
+      (pct) => progressNotifier.state = pct,
+    );
+
+    final ready = await modelInstallService.ensureSubjectSegmentationModel();
+    await subscription.cancel();
+    progressNotifier.state = ready ? 100 : null;
   }
 
   @override
@@ -62,7 +87,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 .scale(begin: const Offset(0.7, 0.7)),
             const SizedBox(height: 28),
             Text(
-              'Crayoli',
+              'Virtual Closet',
               style: GoogleFonts.playfairDisplay(
                 color: AppColors.textPrimary,
                 fontSize: 40,

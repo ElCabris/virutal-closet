@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:crayoli_closet/core/utils/bounded_concurrency.dart';
+import 'package:virtual_closet/core/utils/bounded_concurrency.dart';
 
 void main() {
   group('mapWithConcurrency', () {

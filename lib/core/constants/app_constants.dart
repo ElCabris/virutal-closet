@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Crayoli Closet';
+  static const String appName = 'Virtual Closet';
   static const String appTagline = 'Your closet, curated.';
 
   // Supabase tables

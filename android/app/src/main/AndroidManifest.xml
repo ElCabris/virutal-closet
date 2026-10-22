@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="crayoli_closet"
+        android:label="Virtual Closet"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

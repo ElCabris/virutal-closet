@@ -99,13 +99,18 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
           if (picked[i].path == original[i].path) i,
       ].length;
       if (skipped > 0 && mounted) {
+        // A progress value below 100 means the on-device model triggered by
+        // SplashScreen hasn't finished downloading yet — that's the most
+        // common cause of a skip, and worth telling apart from a genuine
+        // per-photo segmentation failure (no clear subject, corrupt image).
+        final modelProgress = ref.read(backgroundRemovalModelProgressProvider);
+        final message = modelProgress != null && modelProgress < 100
+            ? 'Preparing background removal ($modelProgress%) — '
+                'try again in a moment'
+            : "Couldn't remove background for $skipped of "
+                '${picked.length} photo(s)';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Couldn't remove background for $skipped of "
-              '${picked.length} photo(s)',
-            ),
-          ),
+          SnackBar(content: Text(message)),
         );
       }
     }
