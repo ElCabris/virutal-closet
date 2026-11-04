@@ -11,7 +11,10 @@ dependencies:
     sdk: flutter
 
   # Backend
-  supabase_flutter: ^2.5.0
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.0
+  cloud_firestore: ^5.6.0
+  firebase_storage: ^12.4.0
 
   # State management
   flutter_riverpod: ^2.5.1
@@ -30,7 +33,7 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
-  image_cropper: ^7.1.0
+  image_cropper: ^8.0.2
 
   # On-device background removal (Android only, see BackgroundRemovalService)
   google_mlkit_subject_segmentation: ^0.1.0
@@ -48,7 +51,7 @@ dependencies:
   path: ^1.9.0
   permission_handler: ^11.3.1
   url_launcher: ^6.3.0
-  share_plus: ^9.0.0
+  share_plus: ^10.1.4
   flutter_dotenv: ^5.1.0
   dio: ^5.6.0
 

@@ -1,41 +1,64 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
-import '../models/outfit.dart';
+
+import '../firebase/mappers.dart';
 import '../models/garment.dart';
-import '../../core/constants/app_constants.dart';
+import '../models/outfit.dart';
 
 class OutfitRepository {
-  OutfitRepository(this._supabase);
+  OutfitRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
-  final SupabaseClient _supabase;
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
   final _uuid = const Uuid();
 
-  String get _userId => _supabase.auth.currentUser!.id;
+  String get _userId => _auth.currentUser!.uid;
+
+  CollectionReference<Map<String, dynamic>> get _outfits =>
+      _db.collection('users').doc(_userId).collection('outfits');
+
+  CollectionReference<Map<String, dynamic>> get _garments =>
+      _db.collection('users').doc(_userId).collection('garments');
+
+  CollectionReference<Map<String, dynamic>> get _calendar =>
+      _db.collection('users').doc(_userId).collection('calendar');
 
   Future<List<Outfit>> getOutfits({String? occasion}) async {
-    var query = _supabase
-        .from(AppConstants.tableOutfits)
-        .select()
-        .eq('user_id', _userId);
-
-    if (occasion != null && occasion != 'All') {
-      query = query.eq('occasion', occasion);
-    }
-
-    final data = await query.order('created_at', ascending: false);
-    final outfits = data.map((json) => Outfit.fromJson(json)).toList();
-
-    // Hydrate garments for each outfit
-    return Future.wait(outfits.map(_hydrateOutfit));
+    final snap = await _outfits.orderBy('createdAt', descending: true).get();
+    final wardrobe = await _wardrobeById();
+    final outfits = snap.docs.map((doc) {
+      final ids = List<String>.from(doc.data()['garmentIds'] ?? const []);
+      return outfitFromDoc(
+        doc,
+        garments: [
+          for (final id in ids)
+            if (wardrobe.containsKey(id)) wardrobe[id]!,
+        ],
+      );
+    }).toList();
+    if (occasion == null || occasion == 'All') return outfits;
+    return outfits.where((o) => o.occasion == occasion).toList();
   }
 
   Future<Outfit> getOutfit(String id) async {
-    final data = await _supabase
-        .from(AppConstants.tableOutfits)
-        .select()
-        .eq('id', id)
-        .single();
-    return _hydrateOutfit(Outfit.fromJson(data));
+    final doc = await _outfits.doc(id).get();
+    if (!doc.exists) {
+      throw StateError('Outfit $id was not found');
+    }
+    final wardrobe = await _wardrobeById();
+    final ids = List<String>.from(doc.data()?['garmentIds'] ?? const []);
+    return outfitFromDoc(
+      doc,
+      garments: [
+        for (final garmentId in ids)
+          if (wardrobe.containsKey(garmentId)) wardrobe[garmentId]!,
+      ],
+    );
   }
 
   Future<Outfit> createOutfit({
@@ -46,77 +69,84 @@ class OutfitRepository {
     String? notes,
   }) async {
     final id = _uuid.v4();
-    final data = {
-      'id': id,
-      'user_id': _userId,
+    await _outfits.doc(id).set({
+      'userId': _userId,
       'name': name,
-      'garment_ids': garmentIds,
+      'garmentIds': garmentIds,
       'occasion': occasion,
       'season': season,
       'notes': notes,
-      'wear_count': 0,
-    };
-
-    final result = await _supabase
-        .from(AppConstants.tableOutfits)
-        .insert(data)
-        .select()
-        .single();
-
-    return _hydrateOutfit(Outfit.fromJson(result));
+      'wearCount': 0,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return getOutfit(id);
   }
 
   Future<Outfit> updateOutfit(String id, Map<String, dynamic> updates) async {
-    final result = await _supabase
-        .from(AppConstants.tableOutfits)
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', _userId)
-        .select()
-        .single();
-
-    return _hydrateOutfit(Outfit.fromJson(result));
+    final mapped = <String, dynamic>{
+      for (final entry in updates.entries)
+        _fieldName(entry.key): entry.value,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    await _outfits.doc(id).update(mapped);
+    return getOutfit(id);
   }
 
   Future<void> deleteOutfit(String id) async {
-    await _supabase
-        .from(AppConstants.tableOutfits)
-        .delete()
-        .eq('id', id)
-        .eq('user_id', _userId);
+    final entries = await _calendar.where('outfitId', isEqualTo: id).get();
+    final batch = _db.batch();
+    for (final doc in entries.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_outfits.doc(id));
+    await batch.commit();
   }
 
   Future<void> incrementWearCount(String id) async {
-    final outfit = await getOutfit(id);
-    await _supabase.from(AppConstants.tableOutfits).update({
-      'wear_count': outfit.wearCount + 1,
-      'last_worn': DateTime.now().toIso8601String(),
-    }).eq('id', id).eq('user_id', _userId);
-
-    // Also increment wear count for each garment
-    for (final garmentId in outfit.garmentIds) {
-      final garment = await _supabase
-          .from(AppConstants.tableGarments)
-          .select('wear_count')
-          .eq('id', garmentId)
-          .single();
-      await _supabase.from(AppConstants.tableGarments).update({
-        'wear_count': (garment['wear_count'] as int) + 1,
-        'last_worn': DateTime.now().toIso8601String(),
-      }).eq('id', garmentId);
-    }
+    final outfitRef = _outfits.doc(id);
+    await _db.runTransaction((tx) async {
+      final outfitSnap = await tx.get(outfitRef);
+      final data = outfitSnap.data();
+      if (data == null) return;
+      final ids = List<String>.from(data['garmentIds'] ?? const []);
+      final garmentSnaps = [
+        for (final garmentId in ids) await tx.get(_garments.doc(garmentId)),
+      ];
+      tx.update(outfitRef, {
+        'wearCount': ((data['wearCount'] as num?)?.toInt() ?? 0) + 1,
+        'lastWorn': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      for (final snap in garmentSnaps) {
+        if (!snap.exists) continue;
+        tx.update(snap.reference, {
+          'wearCount': ((snap.data()?['wearCount'] as num?)?.toInt() ?? 0) + 1,
+          'lastWorn': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
   }
 
-  Future<Outfit> _hydrateOutfit(Outfit outfit) async {
-    if (outfit.garmentIds.isEmpty) return outfit;
+  Future<Map<String, Garment>> _wardrobeById() async {
+    final snap = await _garments.get();
+    final garments = await Future.wait(snap.docs.map(garmentFromDoc));
+    return {for (final garment in garments) garment.id: garment};
+  }
 
-    final garmentData = await _supabase
-        .from(AppConstants.tableGarments)
-        .select()
-        .inFilter('id', outfit.garmentIds);
-
-    final garments =
-        garmentData.map((json) => Garment.fromJson(json)).toList();
-    return outfit.copyWith(garments: garments);
+  String _fieldName(String key) {
+    switch (key) {
+      case 'garment_ids':
+        return 'garmentIds';
+      case 'wear_count':
+        return 'wearCount';
+      case 'last_worn':
+        return 'lastWorn';
+      case 'image_url':
+        return 'imageUrl';
+      default:
+        return key;
+    }
   }
 }

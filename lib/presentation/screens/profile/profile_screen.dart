@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -86,8 +87,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAvatar(BuildContext context, user) {
-    final name = user?.userMetadata?['full_name'] as String? ?? 'User';
+  Widget _buildAvatar(BuildContext context, User? user) {
+    final rawName = user?.displayName?.trim();
+    final name = (rawName == null || rawName.isEmpty) ? 'User' : rawName;
     final email = user?.email ?? '';
     final initials = name.trim().split(' ').take(2).map((w) => w[0]).join();
 
@@ -177,7 +179,7 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               context.pop();
-              await ref.read(supabaseProvider).auth.signOut();
+              await FirebaseAuth.instance.signOut();
               if (context.mounted) context.go('/login');
             },
             child: const Text('Sign Out',

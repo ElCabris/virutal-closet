@@ -1,6 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/garment_repository.dart';
 import '../../data/repositories/outfit_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
@@ -13,9 +13,14 @@ import '../../data/models/calendar_entry.dart';
 
 // ─── Infrastructure ───────────────────────────────────────────────────────────
 
-final supabaseProvider = Provider<SupabaseClient>(
-  (_) => Supabase.instance.client,
+final authStateProvider = StreamProvider<User?>(
+  (ref) => FirebaseAuth.instance.authStateChanges(),
 );
+
+final currentUserProvider = Provider<User?>((ref) {
+  final asyncUser = ref.watch(authStateProvider);
+  return asyncUser.asData?.value ?? FirebaseAuth.instance.currentUser;
+});
 
 final aiServiceProvider = Provider<AiService>(
   (_) => AiService(
@@ -41,25 +46,15 @@ final backgroundRemovalModelProgressProvider = StateProvider<int?>((_) => null);
 // ─── Repositories ─────────────────────────────────────────────────────────────
 
 final garmentRepositoryProvider = Provider<GarmentRepository>(
-  (ref) => GarmentRepository(ref.watch(supabaseProvider)),
+  (ref) => GarmentRepository(),
 );
 
 final outfitRepositoryProvider = Provider<OutfitRepository>(
-  (ref) => OutfitRepository(ref.watch(supabaseProvider)),
+  (ref) => OutfitRepository(),
 );
 
 final calendarRepositoryProvider = Provider<CalendarRepository>(
-  (ref) => CalendarRepository(ref.watch(supabaseProvider)),
-);
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-final authStateProvider = StreamProvider<AuthState>(
-  (ref) => ref.watch(supabaseProvider).auth.onAuthStateChange,
-);
-
-final currentUserProvider = Provider<User?>(
-  (ref) => ref.watch(supabaseProvider).auth.currentUser,
+  (ref) => CalendarRepository(),
 );
 
 // ─── Garments ─────────────────────────────────────────────────────────────────
