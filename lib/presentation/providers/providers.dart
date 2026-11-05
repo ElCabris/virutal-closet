@@ -14,7 +14,8 @@ import '../../data/models/calendar_entry.dart';
 // ─── Infrastructure ───────────────────────────────────────────────────────────
 
 final authStateProvider = StreamProvider<User?>(
-  (ref) => FirebaseAuth.instance.authStateChanges(),
+  // userChanges, unlike authStateChanges, also fires on profile updates.
+  (ref) => FirebaseAuth.instance.userChanges(),
 );
 
 final currentUserProvider = Provider<User?>((ref) {

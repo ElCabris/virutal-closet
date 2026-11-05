@@ -27,7 +27,7 @@ class ProfileScreen extends ConsumerWidget {
                 _tile(context,
                     icon: Icons.person_outline,
                     label: 'Edit Profile',
-                    onTap: () {}),
+                    onTap: () => _editName(context, user)),
                 _tile(context,
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
@@ -164,6 +164,22 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _editName(BuildContext context, User? user) async {
+    if (user == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _EditNameDialog(initialName: user.displayName ?? ''),
+    );
+    if (name == null) return;
+    try {
+      await user.updateDisplayName(name);
+      await user.reload();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   void _confirmSignOut(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
@@ -187,6 +203,52 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Owns the text controller, whose lifetime must match the dialog's.
+class _EditNameDialog extends StatefulWidget {
+  const _EditNameDialog({required this.initialName});
+  final String initialName;
+
+  @override
+  State<_EditNameDialog> createState() => _EditNameDialogState();
+}
+
+class _EditNameDialogState extends State<_EditNameDialog> {
+  late final _nameCtrl = TextEditingController(text: widget.initialName);
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _nameCtrl.text.trim();
+    if (name.isNotEmpty) Navigator.pop(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text('Edit Profile'),
+      content: TextField(
+        controller: _nameCtrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(labelText: 'Name'),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(onPressed: _save, child: const Text('Save')),
+      ],
     );
   }
 }
