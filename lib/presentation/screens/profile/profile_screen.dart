@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,48 +27,20 @@ class ProfileScreen extends ConsumerWidget {
                 _tile(context,
                     icon: Icons.person_outline,
                     label: 'Edit Profile',
-                    onTap: () {}),
-                _tile(context,
-                    icon: Icons.notifications_outlined,
-                    label: 'Notifications',
-                    onTap: () {}),
+                    onTap: () => _editName(context, user)),
               ],
             ).animate().fadeIn(delay: 100.ms),
-            const SizedBox(height: 20),
-            _buildSection(
-              context,
-              title: 'Preferences',
-              children: [
-                _tile(context,
-                    icon: Icons.palette_outlined,
-                    label: 'Style Profile',
-                    onTap: () {}),
-                _tile(context,
-                    icon: Icons.cloud_upload_outlined,
-                    label: 'Backup & Sync',
-                    onTap: () {}),
-              ],
-            ).animate().fadeIn(delay: 150.ms),
             const SizedBox(height: 20),
             _buildSection(
               context,
               title: 'About',
               children: [
                 _tile(context,
-                    icon: Icons.privacy_tip_outlined,
-                    label: 'Privacy Policy',
-                    onTap: () {}),
-                _tile(context,
-                    icon: Icons.help_outline,
-                    label: 'Help & Support',
-                    onTap: () {}),
-                _tile(context,
                     icon: Icons.info_outline,
                     label: 'App Version',
                     trailing: const Text('1.0.0',
                         style: TextStyle(
-                            color: AppColors.textDisabled, fontSize: 13)),
-                    onTap: () {}),
+                            color: AppColors.textDisabled, fontSize: 13))),
               ],
             ).animate().fadeIn(delay: 200.ms),
             const SizedBox(height: 32),
@@ -86,8 +59,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAvatar(BuildContext context, user) {
-    final name = user?.userMetadata?['full_name'] as String? ?? 'User';
+  Widget _buildAvatar(BuildContext context, User? user) {
+    final rawName = user?.displayName?.trim();
+    final name = (rawName == null || rawName.isEmpty) ? 'User' : rawName;
     final email = user?.email ?? '';
     final initials = name.trim().split(' ').take(2).map((w) => w[0]).join();
 
@@ -152,7 +126,7 @@ class ProfileScreen extends ConsumerWidget {
       {required IconData icon,
       required String label,
       Widget? trailing,
-      required VoidCallback onTap}) {
+      VoidCallback? onTap}) {
     return ListTile(
       leading: Icon(icon, color: AppColors.textSecondary, size: 20),
       title: Text(label, style: Theme.of(context).textTheme.bodyLarge),
@@ -160,6 +134,22 @@ class ProfileScreen extends ConsumerWidget {
       onTap: onTap,
       minLeadingWidth: 20,
     );
+  }
+
+  Future<void> _editName(BuildContext context, User? user) async {
+    if (user == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _EditNameDialog(initialName: user.displayName ?? ''),
+    );
+    if (name == null) return;
+    try {
+      await user.updateDisplayName(name);
+      await user.reload();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   void _confirmSignOut(BuildContext context, WidgetRef ref) {
@@ -177,7 +167,7 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               context.pop();
-              await ref.read(supabaseProvider).auth.signOut();
+              await FirebaseAuth.instance.signOut();
               if (context.mounted) context.go('/login');
             },
             child: const Text('Sign Out',
@@ -185,6 +175,52 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Owns the text controller, whose lifetime must match the dialog's.
+class _EditNameDialog extends StatefulWidget {
+  const _EditNameDialog({required this.initialName});
+  final String initialName;
+
+  @override
+  State<_EditNameDialog> createState() => _EditNameDialogState();
+}
+
+class _EditNameDialogState extends State<_EditNameDialog> {
+  late final _nameCtrl = TextEditingController(text: widget.initialName);
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _nameCtrl.text.trim();
+    if (name.isNotEmpty) Navigator.pop(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text('Edit Profile'),
+      content: TextField(
+        controller: _nameCtrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(labelText: 'Name'),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(onPressed: _save, child: const Text('Save')),
+      ],
     );
   }
 }

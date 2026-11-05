@@ -1,6 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/garment_repository.dart';
 import '../../data/repositories/outfit_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
@@ -13,9 +13,15 @@ import '../../data/models/calendar_entry.dart';
 
 // ─── Infrastructure ───────────────────────────────────────────────────────────
 
-final supabaseProvider = Provider<SupabaseClient>(
-  (_) => Supabase.instance.client,
+final authStateProvider = StreamProvider<User?>(
+  // userChanges, unlike authStateChanges, also fires on profile updates.
+  (ref) => FirebaseAuth.instance.userChanges(),
 );
+
+final currentUserProvider = Provider<User?>((ref) {
+  final asyncUser = ref.watch(authStateProvider);
+  return asyncUser.asData?.value ?? FirebaseAuth.instance.currentUser;
+});
 
 final aiServiceProvider = Provider<AiService>(
   (_) => AiService(
@@ -34,42 +40,40 @@ final modelInstallServiceProvider = Provider<ModelInstallService>(
 
 /// Subject Segmentation model download progress: null while unknown/not yet
 /// requested, 0-99 while downloading, 100 once confirmed available. Set by
-/// SplashScreen at startup and read by AddGarmentScreen to tell a genuine
+/// SplashScreen at startup and read by GarmentFormScreen to tell a genuine
 /// "still downloading" state apart from a real segmentation failure.
 final backgroundRemovalModelProgressProvider = StateProvider<int?>((_) => null);
 
 // ─── Repositories ─────────────────────────────────────────────────────────────
 
 final garmentRepositoryProvider = Provider<GarmentRepository>(
-  (ref) => GarmentRepository(ref.watch(supabaseProvider)),
+  (ref) => GarmentRepository(),
 );
 
 final outfitRepositoryProvider = Provider<OutfitRepository>(
-  (ref) => OutfitRepository(ref.watch(supabaseProvider)),
+  (ref) => OutfitRepository(),
 );
 
 final calendarRepositoryProvider = Provider<CalendarRepository>(
-  (ref) => CalendarRepository(ref.watch(supabaseProvider)),
-);
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-final authStateProvider = StreamProvider<AuthState>(
-  (ref) => ref.watch(supabaseProvider).auth.onAuthStateChange,
-);
-
-final currentUserProvider = Provider<User?>(
-  (ref) => ref.watch(supabaseProvider).auth.currentUser,
+  (ref) => CalendarRepository(),
 );
 
 // ─── Garments ─────────────────────────────────────────────────────────────────
 
 final selectedCategoryProvider = StateProvider<String>((ref) => 'All');
 
-final garmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) {
-  final repo = ref.watch(garmentRepositoryProvider);
+/// The whole wardrobe, regardless of the category selected in the closet.
+/// Invalidate this one after changing a garment: [garmentsProvider] derives
+/// from it.
+final allGarmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) {
+  return ref.watch(garmentRepositoryProvider).getGarments();
+});
+
+final garmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) async {
+  final garments = await ref.watch(allGarmentsProvider.future);
   final category = ref.watch(selectedCategoryProvider);
-  return repo.getGarments(category: category == 'All' ? null : category);
+  if (category == 'All') return garments;
+  return garments.where((g) => g.category == category).toList();
 });
 
 final garmentProvider =
@@ -108,6 +112,10 @@ final calendarEntriesProvider =
 final calendarEntryForDateProvider =
     FutureProvider.autoDispose.family<CalendarEntry?, DateTime>((ref, date) {
   return ref.watch(calendarRepositoryProvider).getEntryForDate(date);
+});
+
+final upcomingEntriesCountProvider = FutureProvider.autoDispose<int>((ref) {
+  return ref.watch(calendarRepositoryProvider).countUpcomingEntries();
 });
 
 // ─── AI Suggestions ───────────────────────────────────────────────────────────

@@ -9,9 +9,31 @@ import '../../widgets/common/loading_indicator.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/garment.dart';
+import '../../../data/models/outfit.dart';
+
+/// Loads an outfit and opens the builder to edit it.
+class EditOutfitScreen extends ConsumerWidget {
+  const EditOutfitScreen({super.key, required this.id});
+  final String id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(outfitProvider(id)).when(
+          loading: () => const Scaffold(body: LoadingIndicator()),
+          error: (_, __) => Scaffold(
+            appBar: AppBar(),
+            body: const ErrorView(message: 'Outfit not found'),
+          ),
+          data: (outfit) => OutfitBuilderScreen(outfit: outfit),
+        );
+  }
+}
 
 class OutfitBuilderScreen extends ConsumerStatefulWidget {
-  const OutfitBuilderScreen({super.key});
+  const OutfitBuilderScreen({super.key, this.outfit});
+
+  /// The outfit being edited, or null when building a new one.
+  final Outfit? outfit;
 
   @override
   ConsumerState<OutfitBuilderScreen> createState() =>
@@ -24,6 +46,18 @@ class _OutfitBuilderScreenState extends ConsumerState<OutfitBuilderScreen> {
   String? _occasion;
   String? _season;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final outfit = widget.outfit;
+    if (outfit == null) return;
+    _nameCtrl.text = outfit.name;
+    // Garments, not garmentIds: ids of deleted garments must not be kept.
+    _selectedIds.addAll(outfit.garments.map((g) => g.id));
+    _occasion = outfit.occasion;
+    _season = outfit.season;
+  }
 
   @override
   void dispose() {
@@ -49,12 +83,24 @@ class _OutfitBuilderScreenState extends ConsumerState<OutfitBuilderScreen> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(outfitRepositoryProvider).createOutfit(
-            name: _nameCtrl.text.trim(),
-            garmentIds: _selectedIds.toList(),
-            occasion: _occasion,
-            season: _season,
-          );
+      final repo = ref.read(outfitRepositoryProvider);
+      final outfit = widget.outfit;
+      if (outfit == null) {
+        await repo.createOutfit(
+          name: _nameCtrl.text.trim(),
+          garmentIds: _selectedIds.toList(),
+          occasion: _occasion,
+          season: _season,
+        );
+      } else {
+        await repo.updateOutfit(outfit.id, {
+          'name': _nameCtrl.text.trim(),
+          'garment_ids': _selectedIds.toList(),
+          'occasion': _occasion,
+          'season': _season,
+        });
+        ref.invalidate(outfitProvider(outfit.id));
+      }
       ref.invalidate(outfitsProvider);
       if (mounted) context.pop();
     } catch (e) {
@@ -74,7 +120,7 @@ class _OutfitBuilderScreenState extends ConsumerState<OutfitBuilderScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Build Outfit'),
+        title: Text(widget.outfit == null ? 'Build Outfit' : 'Edit Outfit'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
@@ -111,12 +157,12 @@ class _OutfitBuilderScreenState extends ConsumerState<OutfitBuilderScreen> {
           ),
           const SizedBox(height: 12),
           if (_selectedIds.isNotEmpty)
-            garmentsAsync.when(
-              data: (garments) =>
-                  _buildSelectedPreview(_selectedGarments(garments)),
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
+            ref.watch(allGarmentsProvider).when(
+                  data: (garments) =>
+                      _buildSelectedPreview(_selectedGarments(garments)),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
           Expanded(
             child: garmentsAsync.when(
               loading: () => const GarmentGridShimmer(),

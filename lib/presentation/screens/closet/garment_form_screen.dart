@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,15 +10,38 @@ import '../../providers/providers.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/file_utils.dart';
+import '../../../data/models/garment.dart';
+import '../../widgets/common/loading_indicator.dart';
 
-class AddGarmentScreen extends ConsumerStatefulWidget {
-  const AddGarmentScreen({super.key});
+/// Loads a garment and opens the form to edit it.
+class EditGarmentScreen extends ConsumerWidget {
+  const EditGarmentScreen({super.key, required this.id});
+  final String id;
 
   @override
-  ConsumerState<AddGarmentScreen> createState() => _AddGarmentScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(garmentProvider(id)).when(
+          loading: () => const Scaffold(body: LoadingIndicator()),
+          error: (_, __) => Scaffold(
+            appBar: AppBar(),
+            body: const ErrorView(message: 'Garment not found'),
+          ),
+          data: (garment) => GarmentFormScreen(garment: garment),
+        );
+  }
 }
 
-class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
+class GarmentFormScreen extends ConsumerStatefulWidget {
+  const GarmentFormScreen({super.key, this.garment});
+
+  /// The garment being edited, or null when adding a new one.
+  final Garment? garment;
+
+  @override
+  ConsumerState<GarmentFormScreen> createState() => _GarmentFormScreenState();
+}
+
+class _GarmentFormScreenState extends ConsumerState<GarmentFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _brandCtrl = TextEditingController();
@@ -30,9 +54,31 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   String? _occasion;
   String _currency = AppConstants.defaultCurrency;
   final List<File> _imageFiles = [];
+  List<String> _existingImageUrls = const [];
   bool _saving = false;
   bool _removeBackground = true;
   bool _processingImages = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final garment = widget.garment;
+    if (garment == null) return;
+    _nameCtrl.text = garment.name;
+    _brandCtrl.text = garment.brand ?? '';
+    final price = garment.price;
+    if (price != null) {
+      _priceCtrl.text =
+          price == price.roundToDouble() ? price.toStringAsFixed(0) : '$price';
+    }
+    _notesCtrl.text = garment.notes ?? '';
+    _category = garment.category;
+    _color = garment.color;
+    _season = garment.season;
+    _occasion = garment.occasion;
+    _currency = garment.currency;
+    _existingImageUrls = List.of(garment.imageUrls);
+  }
 
   @override
   void dispose() {
@@ -122,19 +168,51 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ref.read(garmentRepositoryProvider).createGarment(
-            name: _nameCtrl.text.trim(),
-            category: _category,
-            brand: _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-            color: _color,
-            season: _season,
-            occasion: _occasion,
-            price: double.tryParse(_priceCtrl.text),
-            currency: _currency,
-            notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-            imageFiles: _imageFiles,
+      final repo = ref.read(garmentRepositoryProvider);
+      final garment = widget.garment;
+      final name = _nameCtrl.text.trim();
+      final brand =
+          _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim();
+      final price = double.tryParse(_priceCtrl.text);
+      final notes =
+          _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
+      if (garment == null) {
+        await repo.createGarment(
+          name: name,
+          category: _category,
+          brand: brand,
+          color: _color,
+          season: _season,
+          occasion: _occasion,
+          price: price,
+          currency: _currency,
+          notes: notes,
+          imageFiles: _imageFiles,
+        );
+      } else {
+        await repo.updateGarment(garment.id, {
+          'name': name,
+          'category': _category,
+          'brand': brand,
+          'color': _color,
+          'season': _season,
+          'occasion': _occasion,
+          'price': price,
+          'currency': _currency,
+          'notes': notes,
+        });
+        final photosChanged = _imageFiles.isNotEmpty ||
+            _existingImageUrls.length != garment.imageUrls.length;
+        if (photosChanged) {
+          await repo.updateGarmentImages(
+            garment.id,
+            keepUrls: _existingImageUrls,
+            newFiles: _imageFiles,
           );
-      ref.invalidate(garmentsProvider);
+        }
+        ref.invalidate(garmentProvider(garment.id));
+      }
+      ref.invalidate(allGarmentsProvider);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
@@ -151,7 +229,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Garment'),
+        title: Text(widget.garment == null ? 'Add Garment' : 'Edit Garment'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
@@ -229,7 +307,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   }
 
   Widget _buildImagePickerContent() {
-    if (_imageFiles.isEmpty) {
+    if (_existingImageUrls.isEmpty && _imageFiles.isEmpty) {
       return GestureDetector(
         onTap: _showImageSourceSheet,
         child: Container(
@@ -264,10 +342,25 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
       height: 220,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _imageFiles.length + 1,
+        itemCount: _existingImageUrls.length + _imageFiles.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          if (index == _imageFiles.length) {
+          if (index < _existingImageUrls.length) {
+            return _buildPhotoTile(
+              image: CachedNetworkImage(
+                imageUrl: _existingImageUrls[index],
+                fit: BoxFit.cover,
+                placeholder: (_, __) =>
+                    Container(color: AppColors.surfaceVariant),
+              ),
+              onRemove: () => setState(() {
+                _existingImageUrls = List.of(_existingImageUrls)
+                  ..removeAt(index);
+              }),
+            );
+          }
+          final fileIndex = index - _existingImageUrls.length;
+          if (fileIndex == _imageFiles.length) {
             return GestureDetector(
               onTap: _showImageSourceSheet,
               child: Container(
@@ -284,41 +377,51 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
               ),
             );
           }
-          return Container(
-            width: 140,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.file(_imageFiles[index], fit: BoxFit.cover),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: () {
-                        final removed = _imageFiles[index];
-                        setState(() => _imageFiles.removeAt(index));
-                        unawaited(deleteFileQuietly(removed));
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppColors.background,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.close, size: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          return _buildPhotoTile(
+            image: Image.file(_imageFiles[fileIndex], fit: BoxFit.cover),
+            onRemove: () {
+              final removed = _imageFiles[fileIndex];
+              setState(() => _imageFiles.removeAt(fileIndex));
+              unawaited(deleteFileQuietly(removed));
+            },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildPhotoTile({
+    required Widget image,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      width: 140,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            image,
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: AppColors.background,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

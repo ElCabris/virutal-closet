@@ -1,18 +1,19 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
-import 'presentation/providers/providers.dart';
 import 'presentation/screens/auth/splash_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/register_screen.dart';
 import 'presentation/screens/main_navigation_screen.dart';
 import 'presentation/screens/closet/closet_screen.dart';
 import 'presentation/screens/closet/garment_detail_screen.dart';
-import 'presentation/screens/closet/add_garment_screen.dart';
+import 'presentation/screens/closet/garment_search_screen.dart';
+import 'presentation/screens/closet/garment_form_screen.dart';
 import 'presentation/screens/outfits/outfits_screen.dart';
 import 'presentation/screens/outfits/outfit_builder_screen.dart';
+import 'presentation/screens/outfits/outfit_detail_screen.dart';
 import 'presentation/screens/calendar/calendar_screen.dart';
 import 'presentation/screens/analytics/analytics_screen.dart';
 import 'presentation/screens/profile/profile_screen.dart';
@@ -23,7 +24,7 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 // Notifica a GoRouter cuando cambia el estado de auth, sin recrear el router.
 class _AuthNotifier extends ChangeNotifier {
   _AuthNotifier() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    FirebaseAuth.instance.authStateChanges().listen((_) {
       notifyListeners();
     });
   }
@@ -38,8 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: notifier,
     redirect: (context, state) {
-      final isLoggedIn =
-          Supabase.instance.client.auth.currentUser != null;
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final loc = state.matchedLocation;
       final isAuthRoute =
           loc == '/login' || loc == '/register' || loc == '/';
@@ -77,13 +77,26 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'add',
                 parentNavigatorKey: _rootNavigatorKey,
-                builder: (_, __) => const AddGarmentScreen(),
+                builder: (_, __) => const GarmentFormScreen(),
+              ),
+              GoRoute(
+                path: 'search',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (_, __) => const GarmentSearchScreen(),
               ),
               GoRoute(
                 path: ':id',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (_, state) =>
                     GarmentDetailScreen(id: state.pathParameters['id']!),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) =>
+                        EditGarmentScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -97,6 +110,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'builder',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (_, __) => const OutfitBuilderScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (_, state) =>
+                    OutfitDetailScreen(id: state.pathParameters['id']!),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) =>
+                        EditOutfitScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),

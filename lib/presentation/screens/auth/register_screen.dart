@@ -1,10 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../providers/providers.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -33,40 +34,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      final response = await ref.read(supabaseProvider).auth.signUp(
-            email: _emailCtrl.text.trim(),
-            password: _passwordCtrl.text,
-            data: {'full_name': _nameCtrl.text.trim()},
-          );
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      final name = _nameCtrl.text.trim();
+      await credential.user?.updateDisplayName(name);
+      final uid = credential.user!.uid;
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'fullName': name,
+        'email': _emailCtrl.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
       if (!mounted) return;
-
-      if (response.session != null) {
-        // Email confirmation disabled — logged in directly
-        context.go('/home');
-      } else if (response.user != null) {
-        // Email confirmation enabled — show message
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF141414),
-            title: const Text('Check your email'),
-            content: Text(
-              'We sent a confirmation link to ${_emailCtrl.text.trim()}.\n\nOpen the link and then sign in.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  context.pop();
-                  context.go('/login');
-                },
-                child: const Text('Go to Sign In'),
-              ),
-            ],
-          ),
-        );
-      }
+      context.go('/home');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

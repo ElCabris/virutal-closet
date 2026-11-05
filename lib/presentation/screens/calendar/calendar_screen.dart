@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/providers.dart';
@@ -137,7 +136,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Widget _buildDayDetail(BuildContext context, CalendarEntry? entry) {
     final isToday = isSameDay(_selectedDay, DateTime.now());
-    final isPast = _selectedDay.isBefore(DateTime.now()) && !isToday;
+    final isPast = _isPastDay;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -179,14 +178,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
           const SizedBox(height: 16),
           entry != null
-              ? _buildEntryCard(context, entry)
+              ? _buildEntryCard(context, entry, canBeWorn: isToday || isPast)
               : _buildEmptyDay(context, isPast),
         ],
       ).animate().fadeIn(duration: 200.ms),
     );
   }
 
-  Widget _buildEntryCard(BuildContext context, CalendarEntry entry) {
+  /// Compares calendar days: table_calendar hands over days as UTC midnights,
+  /// which aren't comparable as instants with a local DateTime.now().
+  bool get _isPastDay {
+    final now = DateTime.now();
+    return DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day)
+        .isBefore(DateTime(now.year, now.month, now.day));
+  }
+
+  Widget _buildEntryCard(
+    BuildContext context,
+    CalendarEntry entry, {
+    required bool canBeWorn,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -224,12 +235,38 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   '${entry.outfit?.garments.length ?? 0} items',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
+                if (entry.worn)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle,
+                            color: AppColors.success, size: 16),
+                        SizedBox(width: 4),
+                        Text('Worn',
+                            style: TextStyle(
+                                color: AppColors.success, fontSize: 12)),
+                      ],
+                    ),
+                  )
+                else if (canBeWorn && entry.outfit != null)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Mark as worn'),
+                    onPressed: () => _updateCalendar(
+                      ref.read(calendarRepositoryProvider).markWorn(
+                            date: _selectedDay,
+                            outfitId: entry.outfitId,
+                          ),
+                    ),
+                  ),
               ],
             ),
           ),
           IconButton(
             icon: const Icon(Icons.swap_horiz, color: AppColors.textSecondary),
-            onPressed: () => _pickOutfit(context),
+            onPressed: () => _pickOutfit(context, entry),
           ),
         ],
       ),
@@ -238,32 +275,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Widget _buildEmptyDay(BuildContext context, bool isPast) {
     return GestureDetector(
-      onTap: isPast ? null : () => _pickOutfit(context),
+      onTap: () => _pickOutfit(context, null),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isPast ? AppColors.border : AppColors.primary.withOpacity(0.3),
-            width: isPast ? 0.5 : 1,
+            color: AppColors.primary.withOpacity(0.3),
+            width: 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(
-              isPast
-                  ? Icons.remove_circle_outline
-                  : Icons.add_circle_outline,
-              color: isPast ? AppColors.textDisabled : AppColors.primary,
-            ),
+            const Icon(Icons.add_circle_outline, color: AppColors.primary),
             const SizedBox(width: 12),
             Text(
-              isPast ? 'No outfit recorded' : 'Plan an outfit for this day',
-              style: TextStyle(
-                color: isPast ? AppColors.textDisabled : AppColors.primary,
-                fontSize: 14,
-              ),
+              isPast ? 'Log what you wore this day' : 'Plan an outfit for this day',
+              style: const TextStyle(color: AppColors.primary, fontSize: 14),
             ),
           ],
         ),
@@ -279,7 +308,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return '${months[_selectedDay.month - 1]} ${_selectedDay.day}';
   }
 
-  Future<void> _pickOutfit(BuildContext context) async {
+  Future<void> _pickOutfit(BuildContext context, CalendarEntry? current) async {
     final outfits = await ref.read(outfitRepositoryProvider).getOutfits();
     if (!mounted || outfits.isEmpty) {
       if (mounted) {
@@ -344,21 +373,32 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
     );
 
-    if (selected != null && mounted) {
-      await ref.read(calendarRepositoryProvider).setOutfitForDate(
-            date: _selectedDay,
-            outfitId: selected,
-          );
-      ref.invalidate(calendarEntriesProvider);
-      ref.invalidate(calendarEntryForDateProvider(_selectedDay));
-    }
+    if (selected == null || !mounted) return;
+    final repo = ref.read(calendarRepositoryProvider);
+    // Picking for a past day records what was worn; so does swapping the
+    // outfit of a day already recorded as worn.
+    final recordsWear = _isPastDay || (current?.worn ?? false);
+    await _updateCalendar(
+      recordsWear
+          ? repo.markWorn(date: _selectedDay, outfitId: selected)
+          : repo.setOutfitForDate(date: _selectedDay, outfitId: selected),
+    );
   }
 
-  Future<void> _removeEntry(BuildContext context) async {
-    await ref
-        .read(calendarRepositoryProvider)
-        .removeEntryForDate(_selectedDay);
+  Future<void> _removeEntry(BuildContext context) => _updateCalendar(
+        ref.read(calendarRepositoryProvider).removeEntryForDate(_selectedDay),
+      );
+
+  Future<void> _updateCalendar(Future<void> change) async {
+    try {
+      await change;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
     ref.invalidate(calendarEntriesProvider);
-    ref.invalidate(calendarEntryForDateProvider(_selectedDay));
+    ref.invalidate(calendarEntryForDateProvider);
   }
 }

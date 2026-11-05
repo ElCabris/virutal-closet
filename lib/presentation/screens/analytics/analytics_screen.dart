@@ -7,6 +7,7 @@ import '../../widgets/garment_card.dart';
 import '../../widgets/common/loading_indicator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/helpers.dart';
+import '../../../data/models/garment.dart';
 
 class AnalyticsScreen extends ConsumerWidget {
   const AnalyticsScreen({super.key});
@@ -16,7 +17,8 @@ class AnalyticsScreen extends ConsumerWidget {
     final categoryStats = ref.watch(categoryStatsProvider);
     final mostWorn = ref.watch(mostWornProvider);
     final leastWorn = ref.watch(leastWornProvider);
-    final garments = ref.watch(garmentsProvider);
+    final garments = ref.watch(allGarmentsProvider);
+    final upcomingEntries = ref.watch(upcomingEntriesCountProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -35,7 +37,11 @@ class AnalyticsScreen extends ConsumerWidget {
               child: garments.when(
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
-                data: (data) => _buildSummaryCards(context, data.length),
+                data: (data) => _buildSummaryCards(
+                  context,
+                  data,
+                  upcomingEntries: upcomingEntries.valueOrNull,
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -74,25 +80,32 @@ class AnalyticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, int total) {
+  Widget _buildSummaryCards(
+    BuildContext context,
+    List<Garment> garments, {
+    required int? upcomingEntries,
+  }) {
+    final costPerWear = averageCostPerWear(garments);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           _summaryCard(context,
-              value: '$total',
+              value: '${garments.length}',
               label: 'Total Items',
               icon: Icons.checkroom_outlined,
               color: AppColors.primary),
           const SizedBox(width: 12),
           _summaryCard(context,
-              value: '0',
+              value: upcomingEntries?.toString() ?? '—',
               label: 'Outfits Planned',
               icon: Icons.calendar_today_outlined,
               color: AppColors.info),
           const SizedBox(width: 12),
           _summaryCard(context,
-              value: '—',
+              value: costPerWear == null
+                  ? '—'
+                  : formatPrice(costPerWear.amount, costPerWear.currency),
               label: 'Cost / Wear',
               icon: Icons.attach_money,
               color: AppColors.success),
@@ -119,12 +132,17 @@ class AnalyticsScreen extends ConsumerWidget {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 10),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.textPrimary,
-                    fontSize: 22,
-                  ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontSize: 22,
+                    ),
+              ),
             ),
             Text(label, style: Theme.of(context).textTheme.labelSmall),
           ],

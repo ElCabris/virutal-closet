@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "7573812804",
+    "project_id": "lookify-closet",
+    "storage_bucket": "lookify-closet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:7573812804:android:0c897d466a81a3d8346e11",
+        "android_client_info": {
+          "package_name": "com.example.virtual_closet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPBMtlfOsIeMccUpO76r6vJ-PJaMRRFrM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

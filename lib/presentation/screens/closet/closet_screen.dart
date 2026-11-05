@@ -36,7 +36,7 @@ class ClosetScreen extends ConsumerWidget {
                 loading: () => const GarmentGridShimmer(),
                 error: (e, _) => ErrorView(
                   message: 'Failed to load wardrobe',
-                  onRetry: () => ref.invalidate(garmentsProvider),
+                  onRetry: () => ref.invalidate(allGarmentsProvider),
                 ),
                 data: (garments) => garments.isEmpty
                     ? EmptyView(
