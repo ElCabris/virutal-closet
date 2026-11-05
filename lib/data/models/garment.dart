@@ -1,5 +1,26 @@
 import '../../core/constants/app_constants.dart';
 
+/// Average cost per wear across [garments] that have a price and at least one
+/// wear. Amounts in different currencies can't be added up, so only the
+/// currency with the most eligible garments counts. Null if none is eligible.
+({double amount, String currency})? averageCostPerWear(
+  Iterable<Garment> garments,
+) {
+  final byCurrency = <String, List<Garment>>{};
+  for (final garment in garments) {
+    if ((garment.price ?? 0) > 0 && garment.wearCount > 0) {
+      byCurrency.putIfAbsent(garment.currency, () => []).add(garment);
+    }
+  }
+  if (byCurrency.isEmpty) return null;
+
+  final top = byCurrency.entries
+      .reduce((a, b) => b.value.length > a.value.length ? b : a);
+  final totalPrice = top.value.fold<double>(0, (sum, g) => sum + g.price!);
+  final totalWears = top.value.fold<int>(0, (sum, g) => sum + g.wearCount);
+  return (amount: totalPrice / totalWears, currency: top.key);
+}
+
 class Garment {
   final String id;
   final String userId;
