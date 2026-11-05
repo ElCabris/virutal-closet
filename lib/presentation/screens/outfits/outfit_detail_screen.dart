@@ -50,6 +50,12 @@ class OutfitDetailScreen extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 12),
                 _buildGarments(context, outfit),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.checkroom),
+                  label: const Text('Log as Worn Today'),
+                  onPressed: () => _logWornToday(context, ref),
+                ),
               ],
             ),
           ),
@@ -103,6 +109,60 @@ class OutfitDetailScreen extends ConsumerWidget {
         garment: outfit.garments[i],
         index: i,
         onTap: () => context.push('/closet/${outfit.garments[i].id}'),
+      ),
+    );
+  }
+
+  Future<void> _logWornToday(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final calendar = ref.read(calendarRepositoryProvider);
+    final today = DateTime.now();
+    try {
+      final entry = await calendar.getEntryForDate(today);
+      if (entry != null && entry.outfitId == id && entry.worn) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Already logged for today')),
+        );
+        return;
+      }
+      if (entry != null && entry.outfitId != id && context.mounted) {
+        final replace = await _confirmReplace(context, entry.outfit?.name);
+        if (replace != true) return;
+      }
+      await calendar.markWorn(date: today, outfitId: id);
+      ref.invalidate(outfitProvider(id));
+      ref.invalidate(outfitsProvider);
+      ref.invalidate(allGarmentsProvider);
+      ref.invalidate(calendarEntriesProvider);
+      ref.invalidate(calendarEntryForDateProvider);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Logged as worn!')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<bool?> _confirmReplace(BuildContext context, String? otherName) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Replace today\'s outfit?'),
+        content: Text(
+          'Today already has ${otherName ?? 'another outfit'} on the calendar. '
+          'Each day holds one outfit.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Replace'),
+          ),
+        ],
       ),
     );
   }
