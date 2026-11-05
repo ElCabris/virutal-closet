@@ -55,6 +55,17 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
               ),
               actions: [
                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: CircleAvatar(
+                    backgroundColor: AppColors.background.withOpacity(0.8),
+                    child: IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      onPressed: () =>
+                          context.push('/closet/${widget.id}/edit'),
+                    ),
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.all(8),
                   child: CircleAvatar(
                     backgroundColor: AppColors.background.withOpacity(0.8),
@@ -128,7 +139,7 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(photos.length, (i) {
-                final active = i == _photoIndex;
+                final active = i == _photoIndex.clamp(0, photos.length - 1);
                 return AnimatedContainer(
                   duration: 200.ms,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
