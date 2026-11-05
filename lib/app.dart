@@ -9,6 +9,7 @@ import 'presentation/screens/auth/register_screen.dart';
 import 'presentation/screens/main_navigation_screen.dart';
 import 'presentation/screens/closet/closet_screen.dart';
 import 'presentation/screens/closet/garment_detail_screen.dart';
+import 'presentation/screens/closet/garment_search_screen.dart';
 import 'presentation/screens/closet/add_garment_screen.dart';
 import 'presentation/screens/outfits/outfits_screen.dart';
 import 'presentation/screens/outfits/outfit_builder_screen.dart';
@@ -76,6 +77,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'add',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (_, __) => const AddGarmentScreen(),
+              ),
+              GoRoute(
+                path: 'search',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (_, __) => const GarmentSearchScreen(),
               ),
               GoRoute(
                 path: ':id',

@@ -42,6 +42,20 @@ class Garment {
     return price! / wearCount;
   }
 
+  /// Whether every word of [query] appears in the garment's descriptive
+  /// fields, ignoring case. A blank query matches everything.
+  bool matchesQuery(String query) {
+    final haystack = [name, category, brand, color, season, occasion, notes]
+        .whereType<String>()
+        .join(' ')
+        .toLowerCase();
+    return query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .every(haystack.contains);
+  }
+
   factory Garment.fromJson(Map<String, dynamic> json) => Garment(
         id: json['id'] as String,
         userId: json['user_id'] as String,
