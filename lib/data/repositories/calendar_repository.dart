@@ -34,6 +34,15 @@ class CalendarRepository {
     return Future.wait(snap.docs.map(_entryFromDoc));
   }
 
+  /// Number of days from today onwards that have an outfit assigned.
+  Future<int> countUpcomingEntries() async {
+    final snap = await _calendar
+        .orderBy(FieldPath.documentId)
+        .startAt([_dateId(DateTime.now())])
+        .get();
+    return snap.size;
+  }
+
   Future<CalendarEntry?> getEntryForDate(DateTime date) async {
     final doc = await _calendar.doc(_dateId(date)).get();
     if (!doc.exists) return null;

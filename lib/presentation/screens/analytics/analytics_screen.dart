@@ -17,6 +17,7 @@ class AnalyticsScreen extends ConsumerWidget {
     final mostWorn = ref.watch(mostWornProvider);
     final leastWorn = ref.watch(leastWornProvider);
     final garments = ref.watch(allGarmentsProvider);
+    final upcomingEntries = ref.watch(upcomingEntriesCountProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -35,7 +36,11 @@ class AnalyticsScreen extends ConsumerWidget {
               child: garments.when(
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
-                data: (data) => _buildSummaryCards(context, data.length),
+                data: (data) => _buildSummaryCards(
+                  context,
+                  data.length,
+                  upcomingEntries: upcomingEntries.valueOrNull,
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -74,7 +79,11 @@ class AnalyticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, int total) {
+  Widget _buildSummaryCards(
+    BuildContext context,
+    int total, {
+    required int? upcomingEntries,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -86,7 +95,7 @@ class AnalyticsScreen extends ConsumerWidget {
               color: AppColors.primary),
           const SizedBox(width: 12),
           _summaryCard(context,
-              value: '0',
+              value: upcomingEntries?.toString() ?? '—',
               label: 'Outfits Planned',
               icon: Icons.calendar_today_outlined,
               color: AppColors.info),

@@ -113,6 +113,10 @@ final calendarEntryForDateProvider =
   return ref.watch(calendarRepositoryProvider).getEntryForDate(date);
 });
 
+final upcomingEntriesCountProvider = FutureProvider.autoDispose<int>((ref) {
+  return ref.watch(calendarRepositoryProvider).countUpcomingEntries();
+});
+
 // ─── AI Suggestions ───────────────────────────────────────────────────────────
 
 class AiSuggestionParams {
