@@ -7,6 +7,9 @@ class CalendarEntry {
   final Outfit? outfit;
   final DateTime date;
   final String? notes;
+
+  /// Whether the outfit was actually worn that day, rather than just planned.
+  final bool worn;
   final DateTime createdAt;
 
   const CalendarEntry({
@@ -16,6 +19,7 @@ class CalendarEntry {
     this.outfit,
     required this.date,
     this.notes,
+    this.worn = false,
     required this.createdAt,
   });
 
@@ -28,6 +32,7 @@ class CalendarEntry {
             : null,
         date: DateTime.parse(json['date'] as String),
         notes: json['notes'] as String?,
+        worn: json['worn'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String),
       );
 
@@ -37,6 +42,7 @@ class CalendarEntry {
         'outfit_id': outfitId,
         'date': date.toIso8601String().split('T')[0],
         'notes': notes,
+        'worn': worn,
         'created_at': createdAt.toIso8601String(),
       };
 }

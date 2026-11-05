@@ -103,32 +103,6 @@ class OutfitRepository {
     await batch.commit();
   }
 
-  Future<void> incrementWearCount(String id) async {
-    final outfitRef = _outfits.doc(id);
-    await _db.runTransaction((tx) async {
-      final outfitSnap = await tx.get(outfitRef);
-      final data = outfitSnap.data();
-      if (data == null) return;
-      final ids = List<String>.from(data['garmentIds'] ?? const []);
-      final garmentSnaps = [
-        for (final garmentId in ids) await tx.get(_garments.doc(garmentId)),
-      ];
-      tx.update(outfitRef, {
-        'wearCount': ((data['wearCount'] as num?)?.toInt() ?? 0) + 1,
-        'lastWorn': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      for (final snap in garmentSnaps) {
-        if (!snap.exists) continue;
-        tx.update(snap.reference, {
-          'wearCount': ((snap.data()?['wearCount'] as num?)?.toInt() ?? 0) + 1,
-          'lastWorn': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    });
-  }
-
   Future<Map<String, Garment>> _wardrobeById() async {
     final snap = await _garments.get();
     final garments = await Future.wait(snap.docs.map(garmentFromDoc));
