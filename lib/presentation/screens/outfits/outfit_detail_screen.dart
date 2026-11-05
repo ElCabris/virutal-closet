@@ -21,7 +21,16 @@ class OutfitDetailScreen extends ConsumerWidget {
             body: const ErrorView(message: 'Outfit not found'),
           ),
           data: (outfit) => Scaffold(
-            appBar: AppBar(title: Text(outfit.name)),
+            appBar: AppBar(
+              title: Text(outfit.name),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit outfit',
+                  onPressed: () => context.push('/outfits/$id/edit'),
+                ),
+              ],
+            ),
             body: ListView(
               padding: const EdgeInsets.all(20),
               children: [

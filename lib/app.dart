@@ -116,6 +116,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (_, state) =>
                     OutfitDetailScreen(id: state.pathParameters['id']!),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) =>
+                        EditOutfitScreen(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
