@@ -330,6 +330,7 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
         onPressed: () async {
           await ref.read(garmentRepositoryProvider).incrementWearCount(id);
           ref.invalidate(garmentProvider(id));
+          ref.invalidate(allGarmentsProvider);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Logged as worn!')),
