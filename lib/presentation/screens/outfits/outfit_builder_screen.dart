@@ -111,12 +111,12 @@ class _OutfitBuilderScreenState extends ConsumerState<OutfitBuilderScreen> {
           ),
           const SizedBox(height: 12),
           if (_selectedIds.isNotEmpty)
-            garmentsAsync.when(
-              data: (garments) =>
-                  _buildSelectedPreview(_selectedGarments(garments)),
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
+            ref.watch(allGarmentsProvider).when(
+                  data: (garments) =>
+                      _buildSelectedPreview(_selectedGarments(garments)),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
           Expanded(
             child: garmentsAsync.when(
               loading: () => const GarmentGridShimmer(),
