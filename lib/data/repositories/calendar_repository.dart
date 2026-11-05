@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../firebase/mappers.dart';
 import '../models/calendar_entry.dart';
+import '../models/garment.dart';
 import '../models/outfit.dart';
 
 class CalendarRepository {
@@ -22,6 +23,9 @@ class CalendarRepository {
 
   CollectionReference<Map<String, dynamic>> get _outfits =>
       _db.collection('users').doc(_userId).collection('outfits');
+
+  CollectionReference<Map<String, dynamic>> get _garments =>
+      _db.collection('users').doc(_userId).collection('garments');
 
   Future<List<CalendarEntry>> getEntriesForMonth(int year, int month) async {
     final start = _dateId(DateTime(year, month, 1));
@@ -46,7 +50,7 @@ class CalendarRepository {
   Future<CalendarEntry?> getEntryForDate(DateTime date) async {
     final doc = await _calendar.doc(_dateId(date)).get();
     if (!doc.exists) return null;
-    return _entryFromDoc(doc);
+    return _entryFromDoc(doc, includeGarments: true);
   }
 
   Future<CalendarEntry> setOutfitForDate({
@@ -78,14 +82,20 @@ class CalendarRepository {
   }
 
   Future<CalendarEntry> _entryFromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) async {
+    DocumentSnapshot<Map<String, dynamic>> doc, {
+    bool includeGarments = false,
+  }) async {
     final data = doc.data() ?? {};
     final outfitId = data['outfitId'] as String? ?? '';
     Outfit? outfit;
     if (outfitId.isNotEmpty) {
       final outfitDoc = await _outfits.doc(outfitId).get();
-      if (outfitDoc.exists) outfit = outfitFromDoc(outfitDoc);
+      if (outfitDoc.exists) {
+        outfit = outfitFromDoc(
+          outfitDoc,
+          garments: includeGarments ? await _garmentsOf(outfitDoc) : const [],
+        );
+      }
     }
     final createdAt = firestoreDate(data['createdAt']) ?? DateTime.now();
     return CalendarEntry(
@@ -97,6 +107,14 @@ class CalendarRepository {
       notes: data['notes'] as String?,
       createdAt: createdAt,
     );
+  }
+
+  Future<List<Garment>> _garmentsOf(
+    DocumentSnapshot<Map<String, dynamic>> outfitDoc,
+  ) async {
+    final ids = List<String>.from(outfitDoc.data()?['garmentIds'] ?? const []);
+    final docs = await Future.wait(ids.map((id) => _garments.doc(id).get()));
+    return Future.wait(docs.where((d) => d.exists).map(garmentFromDoc));
   }
 
   String _dateId(DateTime date) {
