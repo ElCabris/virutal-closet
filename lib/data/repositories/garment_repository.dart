@@ -114,6 +114,48 @@ class GarmentRepository {
     return getGarment(id);
   }
 
+  /// Replaces the garment's photos with [keepUrls] (existing download URLs,
+  /// in order) followed by [newFiles]. Photos left out are deleted from
+  /// storage once the garment no longer references them.
+  Future<void> updateGarmentImages(
+    String id, {
+    required List<String> keepUrls,
+    List<File> newFiles = const [],
+  }) async {
+    final doc = _garments.doc(id);
+    final previous = _imagePaths((await doc.get()).data());
+    final kept = [
+      for (final url in keepUrls) _storage.refFromURL(url).fullPath,
+    ];
+
+    final uploaded = <String>[];
+    try {
+      final added = await Future.wait(newFiles.map((file) async {
+        final path = await _uploadImage(file);
+        uploaded.add(path);
+        return path;
+      }));
+      final paths = [...kept, ...added];
+      await doc.update({
+        'images': [
+          for (var i = 0; i < paths.length; i++)
+            {'path': paths[i], 'position': i},
+        ],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      await _deleteStorage(uploaded);
+      rethrow;
+    }
+
+    await _deleteStorage(
+      previous.where((path) => !kept.contains(path)).toList(),
+    );
+    for (final file in newFiles) {
+      await deleteFileQuietly(file);
+    }
+  }
+
   Future<void> deleteGarment(String id) async {
     final doc = await _garments.doc(id).get();
     final paths = _imagePaths(doc.data());
