@@ -29,6 +29,11 @@ class OutfitDetailScreen extends ConsumerWidget {
                   tooltip: 'Edit outfit',
                   onPressed: () => context.push('/outfits/$id/edit'),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete outfit',
+                  onPressed: () => _confirmDelete(context, ref),
+                ),
               ],
             ),
             body: ListView(
@@ -98,6 +103,37 @@ class OutfitDetailScreen extends ConsumerWidget {
         garment: outfit.garments[i],
         index: i,
         onTap: () => context.push('/closet/${outfit.garments[i].id}'),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete Outfit'),
+        content: const Text(
+            'This outfit and its calendar entries will be removed. '
+            'Your garments are not affected.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await ref.read(outfitRepositoryProvider).deleteOutfit(id);
+              ref.invalidate(outfitsProvider);
+              ref.invalidate(calendarEntriesProvider);
+              ref.invalidate(calendarEntryForDateProvider);
+              if (context.mounted) context.pop();
+            },
+            child: const Text('Delete',
+                style: TextStyle(color: AppColors.error)),
+          ),
+        ],
       ),
     );
   }
