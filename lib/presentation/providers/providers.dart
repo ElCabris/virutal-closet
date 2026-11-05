@@ -39,7 +39,7 @@ final modelInstallServiceProvider = Provider<ModelInstallService>(
 
 /// Subject Segmentation model download progress: null while unknown/not yet
 /// requested, 0-99 while downloading, 100 once confirmed available. Set by
-/// SplashScreen at startup and read by AddGarmentScreen to tell a genuine
+/// SplashScreen at startup and read by GarmentFormScreen to tell a genuine
 /// "still downloading" state apart from a real segmentation failure.
 final backgroundRemovalModelProgressProvider = StateProvider<int?>((_) => null);
 

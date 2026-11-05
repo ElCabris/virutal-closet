@@ -21,7 +21,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     _navigate();
     // Fire-and-forget: the model can take minutes to download on a slow
     // connection, so this must not block the splash screen. Progress lands
-    // in backgroundRemovalModelProgressProvider for AddGarmentScreen to
+    // in backgroundRemovalModelProgressProvider for GarmentFormScreen to
     // read whenever the user gets there. Deferred via Future() (not called
     // directly) because Riverpod forbids modifying provider state
     // synchronously from initState — it needs to run after this frame.

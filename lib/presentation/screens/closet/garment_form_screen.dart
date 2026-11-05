@@ -10,14 +10,14 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/file_utils.dart';
 
-class AddGarmentScreen extends ConsumerStatefulWidget {
-  const AddGarmentScreen({super.key});
+class GarmentFormScreen extends ConsumerStatefulWidget {
+  const GarmentFormScreen({super.key});
 
   @override
-  ConsumerState<AddGarmentScreen> createState() => _AddGarmentScreenState();
+  ConsumerState<GarmentFormScreen> createState() => _GarmentFormScreenState();
 }
 
-class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
+class _GarmentFormScreenState extends ConsumerState<GarmentFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _brandCtrl = TextEditingController();
