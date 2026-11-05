@@ -16,7 +16,7 @@ class AnalyticsScreen extends ConsumerWidget {
     final categoryStats = ref.watch(categoryStatsProvider);
     final mostWorn = ref.watch(mostWornProvider);
     final leastWorn = ref.watch(leastWornProvider);
-    final garments = ref.watch(garmentsProvider);
+    final garments = ref.watch(allGarmentsProvider);
 
     return Scaffold(
       body: SafeArea(
