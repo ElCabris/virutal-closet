@@ -346,7 +346,7 @@ class _GarmentDetailScreenState extends ConsumerState<GarmentDetailScreen> {
             onPressed: () async {
               context.pop();
               await ref.read(garmentRepositoryProvider).deleteGarment(widget.id);
-              ref.invalidate(garmentsProvider);
+              ref.invalidate(allGarmentsProvider);
               if (context.mounted) context.pop();
             },
             child: const Text('Delete',

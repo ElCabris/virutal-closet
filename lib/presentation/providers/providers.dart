@@ -61,10 +61,18 @@ final calendarRepositoryProvider = Provider<CalendarRepository>(
 
 final selectedCategoryProvider = StateProvider<String>((ref) => 'All');
 
-final garmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) {
-  final repo = ref.watch(garmentRepositoryProvider);
+/// The whole wardrobe, regardless of the category selected in the closet.
+/// Invalidate this one after changing a garment: [garmentsProvider] derives
+/// from it.
+final allGarmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) {
+  return ref.watch(garmentRepositoryProvider).getGarments();
+});
+
+final garmentsProvider = FutureProvider.autoDispose<List<Garment>>((ref) async {
+  final garments = await ref.watch(allGarmentsProvider.future);
   final category = ref.watch(selectedCategoryProvider);
-  return repo.getGarments(category: category == 'All' ? null : category);
+  if (category == 'All') return garments;
+  return garments.where((g) => g.category == category).toList();
 });
 
 final garmentProvider =

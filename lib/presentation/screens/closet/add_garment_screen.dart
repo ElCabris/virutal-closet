@@ -134,7 +134,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
             imageFiles: _imageFiles,
           );
-      ref.invalidate(garmentsProvider);
+      ref.invalidate(allGarmentsProvider);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
