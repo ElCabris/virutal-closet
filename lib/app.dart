@@ -13,6 +13,7 @@ import 'presentation/screens/closet/garment_search_screen.dart';
 import 'presentation/screens/closet/garment_form_screen.dart';
 import 'presentation/screens/outfits/outfits_screen.dart';
 import 'presentation/screens/outfits/outfit_builder_screen.dart';
+import 'presentation/screens/outfits/outfit_detail_screen.dart';
 import 'presentation/screens/calendar/calendar_screen.dart';
 import 'presentation/screens/analytics/analytics_screen.dart';
 import 'presentation/screens/profile/profile_screen.dart';
@@ -109,6 +110,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'builder',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (_, __) => const OutfitBuilderScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (_, state) =>
+                    OutfitDetailScreen(id: state.pathParameters['id']!),
               ),
             ],
           ),
